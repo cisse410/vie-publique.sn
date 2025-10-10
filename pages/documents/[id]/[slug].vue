@@ -1,15 +1,15 @@
 <!-- [slug].vue -->
 <script setup lang="ts">
-const route = useRoute();
-const { document, loading, error, fetchDocumentById } = useDocuments();
-const router = useRouter();
+const route = useRoute()
+const { document, loading, error, fetchDocumentById } = useDocuments()
+const router = useRouter()
 
 onMounted(async () => {
   if (route.params.id) {
-    console.log(route.params.id);
-    await fetchDocumentById(route.params.id as string);
+    console.log(route.params.id)
+    await fetchDocumentById(route.params.id as string)
   }
-});
+})
 
 // Configuration SEO dynamique
 watchEffect(() => {
@@ -18,26 +18,26 @@ watchEffect(() => {
       title: document.value.title,
       link: [
         {
-          rel: "canonical",
+          rel: 'canonical',
           href: `https://vie-publique.sn/documents/${document.value.id}/${document.value.slug}`,
         },
       ],
       meta: [
-        { name: "description", content: document.value.description },
-        { property: "og:title", content: document.value.title },
+        { name: 'description', content: document.value.description },
+        { property: 'og:title', content: document.value.title },
         {
-          property: "og:description",
+          property: 'og:description',
           content: document.value.description,
         },
       ],
-    });
+    })
   }
-});
+})
 
 // Fonction pour obtenir l'URL de l'asset via le nouveau proxy
 const getAssetUrl = (assetId: string, slug: string) => {
-  return useCmsFile(`${assetId}/${slug}.pdf`);
-};
+  return useCmsFile(`${assetId}/${slug}.pdf`)
+}
 </script>
 
 <template>
@@ -48,21 +48,15 @@ const getAssetUrl = (assetId: string, slug: string) => {
       variant="ghost"
       label="Retour à la liste"
       color="gray"
-      @click.native="router.back()"
+      @click="router.back()"
     />
 
     <!-- Loading state -->
     <div v-if="loading" class="space-y-4">
-      <div
-        class="h-8 w-3/4 animate-pulse rounded bg-gray-200 dark:bg-gray-700"
-      ></div>
-      <div
-        class="h-64 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700"
-      ></div>
+      <div class="h-8 w-3/4 animate-pulse rounded bg-gray-200 dark:bg-gray-700"></div>
+      <div class="h-64 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700"></div>
       <div class="h-4 animate-pulse rounded bg-gray-200 dark:bg-gray-700"></div>
-      <div
-        class="h-4 w-3/4 animate-pulse rounded bg-gray-200 dark:bg-gray-700"
-      ></div>
+      <div class="h-4 w-3/4 animate-pulse rounded bg-gray-200 dark:bg-gray-700"></div>
     </div>
 
     <!-- Error state -->
@@ -75,13 +69,11 @@ const getAssetUrl = (assetId: string, slug: string) => {
     />
 
     <!-- Contenu -->
-    <div
-      v-else-if="document"
-      class="prose prose-sm sm:prose dark:prose-invert mx-2 mx-auto"
-    >
-      <div class="">
+    <div v-else-if="document" class="prose prose-sm sm:prose dark:prose-invert mx-2 mx-auto">
+      <div>
         <h1>{{ document.title }}</h1>
       </div>
+
       <!-- PDF Download link -->
       <div v-if="document.file && document.content_html" class="my-4">
         <a
@@ -96,23 +88,20 @@ const getAssetUrl = (assetId: string, slug: string) => {
       <!-- Contenu HTML -->
       <div v-html="document.content_html"></div>
 
-      <ClientOnly v-if="document.file" placeholder="Chargement en cours">
-        <div class="mt-8">
-          <h3 class="mb-4 text-lg font-medium text-gray-900 dark:text-gray-100">
-            Document PDF
-          </h3>
-          <PdfViewer
-            :source="getAssetUrl(document.file, document.slug)"
-            :download-name="`${document.slug}.pdf`"
-          />
-        </div>
-      </ClientOnly>
+      <!-- Composant PDF réutilisable -->
+      <PdfDocument
+        v-if="document.file"
+        :src="getAssetUrl(document.file, document.slug)"
+        height="800px"
+        :show-toolbar="true"
+        :show-download="true"
+        :initial-scale="1.2"
+        loading-placeholder="Chargement du document officiel..."
+      />
     </div>
 
     <!-- Not found state -->
-    <div v-else class="py-8 text-center text-gray-500 dark:text-gray-400">
-      Document non trouvé
-    </div>
+    <div v-else class="py-8 text-center text-gray-500 dark:text-gray-400">Document non trouvé</div>
 
     <ScrollToTopButton />
   </div>
