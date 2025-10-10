@@ -88,14 +88,23 @@ const getAssetUrl = (assetId: string, slug: string) => {
       <!-- Contenu HTML -->
       <div v-html="document.content_html"></div>
 
-      <!-- Composant PDF réutilisable -->
-      <PdfDocument
+      <!-- <PdfDocument
         v-if="document.file"
         :src="getAssetUrl(document.file, document.slug)"
         height="800px"
         :show-toolbar="true"
         :show-download="true"
         :initial-scale="1.2"
+        loading-placeholder="Chargement du document officiel..."
+      /> -->
+
+      <VPdfEmbed
+        v-if="document.file"
+        :src="getAssetUrl(document.file, document.slug)"
+        height="800px"
+        :show-controls="true"
+        :show-download="true"
+        :initial-scale="1.0"
         loading-placeholder="Chargement du document officiel..."
       />
     </div>
