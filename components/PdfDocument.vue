@@ -54,6 +54,7 @@
           :page="currentPage"
           :scale="scale"
           :rotation="rotation"
+          :toolbar-options="toolbarOptions"
           @document-loaded="handleDocumentLoaded"
           @page-loaded="handlePageLoaded"
           @error="handleError"
@@ -81,7 +82,7 @@
 </template>
 
 <script setup lang="ts">
-import { VPdfViewer } from '@vue-pdf-viewer/viewer'
+import { VPdfViewer, type ToolbarOptions } from '@vue-pdf-viewer/viewer'
 
 interface Props {
   src: string
@@ -102,6 +103,12 @@ const props = withDefaults(defineProps<Props>(), {
   loadingPlaceholder: 'Chargement du document PDF...',
 })
 
+const toolbarOptions: Partial<ToolbarOptions> = {
+  newFileOpenable: false,
+  sidebarEnable: false,
+  commentPanelEnabled: false,
+}
+
 // États
 const currentPage = ref(1)
 const totalPages = ref(0)
@@ -118,16 +125,14 @@ const containerStyle = computed(() => ({
 // Handlers
 const handleDocumentLoaded = (pdf: any) => {
   totalPages.value = pdf.numPages
-  console.log('📄 PDF chargé:', pdf.numPages, 'pages')
 }
 
 const handlePageLoaded = (pageData: any) => {
-  console.log('✅ Page', pageData.pageNumber, 'chargée')
+  console.log('✅ Page', pageData.pageNumber, 'chargée', pageData.pageNumber)
 }
 
 const handleError = (error: any) => {
   errorMessage.value = error?.message || 'Impossible de charger le PDF'
-  console.error('❌ Erreur PDF:', error)
 }
 
 // Actions toolbar

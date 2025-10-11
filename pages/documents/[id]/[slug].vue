@@ -88,25 +88,25 @@ const getAssetUrl = (assetId: string, slug: string) => {
       <!-- Contenu HTML -->
       <div v-html="document.content_html"></div>
 
-      <!-- <PdfDocument
+      <PdfDocument
         v-if="document.file"
         :src="getAssetUrl(document.file, document.slug)"
         height="800px"
         :show-toolbar="true"
         :show-download="true"
         :initial-scale="1.2"
-        loading-placeholder="Chargement du document officiel..."
-      /> -->
+        loading-placeholder="Chargement du document..."
+      />
 
-      <VPdfEmbed
+      <!-- <VPdfEmbed
         v-if="document.file"
         :src="getAssetUrl(document.file, document.slug)"
         height="800px"
         :show-controls="true"
         :show-download="true"
         :initial-scale="1.0"
-        loading-placeholder="Chargement du document officiel..."
-      />
+        loading-placeholder="Chargement du document..."
+      /> -->
     </div>
 
     <!-- Not found state -->
