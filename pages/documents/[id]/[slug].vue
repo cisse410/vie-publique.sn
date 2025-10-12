@@ -88,25 +88,7 @@ const getAssetUrl = (assetId: string, slug: string) => {
       <!-- Contenu HTML -->
       <div v-html="document.content_html"></div>
 
-      <PdfDocument
-        v-if="document.file"
-        :src="getAssetUrl(document.file, document.slug)"
-        height="800px"
-        :show-toolbar="true"
-        :show-download="true"
-        :initial-scale="1.2"
-        loading-placeholder="Chargement du document..."
-      />
-
-      <!-- <VPdfEmbed
-        v-if="document.file"
-        :src="getAssetUrl(document.file, document.slug)"
-        height="800px"
-        :show-controls="true"
-        :show-download="true"
-        :initial-scale="1.0"
-        loading-placeholder="Chargement du document..."
-      /> -->
+      <PDFJsViewer :source="getAssetUrl(document.file, document.slug)" height="800px" />
     </div>
 
     <!-- Not found state -->
