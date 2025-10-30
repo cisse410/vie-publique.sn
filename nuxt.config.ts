@@ -181,6 +181,8 @@ export default defineNuxtConfig({
     typesenseCollection: process.env.TYPESENSE_COLLECTION,
     cmsApiUrl: process.env.CMS_API_URL,
     cmsApiKey: process.env.CMS_API_KEY,
+    etatCmsApiUrl: process.env.ETAT_CMS_API_URL,
+    etatCmsApiKey: process.env.ETAT_CMS_API_KEY,
     bictorysApiKey: process.env.BICTORYS_API_KEY,
     bictorysApiUrl: process.env.BICTORYS_API_URL,
     bictorysWebhookSecret: process.env.BICTORYS_WEBHOOK_SECRET,
