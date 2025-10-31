@@ -87,7 +87,7 @@ const isChildExpanded = (nodeId: string) => expandedNodes.value.has(nodeId)
       </div>
 
       <!-- Badge de comparaison -->
-      <div v-if="node.badge" class="flex-shrink-0">
+      <!-- <div v-if="node.badge" class="flex-shrink-0">
         <UBadge
           :color="getBadgeColor(node.badge)"
           variant="subtle"
@@ -95,7 +95,7 @@ const isChildExpanded = (nodeId: string) => expandedNodes.value.has(nodeId)
         >
           {{ node.badge }}
         </UBadge>
-      </div>
+      </div> -->
 
       <!-- Children count -->
       <div v-if="hasChildren" class="flex-shrink-0">

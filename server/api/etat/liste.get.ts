@@ -69,32 +69,126 @@ export default defineCachedEventHandler(async (event): Promise<ListeResponse> =>
       searchFilter.org_type_id = { _eq: typeFilter };
     }
 
-    console.log(`[Etat API Liste] Recherche avec: search="${searchTerm}", type=${typeFilter}, page=${page}`);
+    console.log(`[Etat API Liste] Recherche avec: search="${searchTerm}", type=${typeFilter}, page=${page}, snapshot=${snapshotId}`);
 
-    // Récupérer le nombre total d'entités correspondantes
-    const totalResponse = await cms.request(readItems(
-      "public_entity",
+    // APPROCHE SIMPLIFIÉE: Récupérer d'abord les IDs des entités filtrées, puis les org_units
+    let filteredEntityIds: string[] = [];
+
+    if (searchTerm || typeFilter) {
+      // Si on a des filtres, d'abord trouver les entités qui matchent
+      console.log(`[Etat API Liste] Recherche des entités matchant les critères...`);
+
+      const entityFilter: any = {};
+      if (searchTerm) {
+        entityFilter.nom_canonique = { _icontains: searchTerm };
+      }
+      if (typeFilter) {
+        entityFilter.org_type_id = { _eq: typeFilter };
+      }
+
+      const matchingEntities = await cms.request(readItems(
+        "public_entity",
+        {
+          filter: entityFilter,
+          fields: ["id"],
+          limit: -1,
+        }
+      ));
+
+      filteredEntityIds = (matchingEntities as any[]).map(e => e.id);
+      console.log(`[Etat API Liste] ${filteredEntityIds.length} entités matchent les critères`);
+
+      if (filteredEntityIds.length === 0) {
+        // Aucune entité ne matche les critères
+        console.log(`[Etat API Liste] Aucune entité trouvée avec ces critères`);
+        return {
+          entities: [],
+          total: 0,
+          page,
+          pageSize: PAGE_SIZE,
+          snapshot: snapshot as OrgSnapshot,
+        };
+      }
+    }
+
+    // Construire le filtre pour les org_units
+    const orgUnitFilter: any = {
+      snapshot_id: { _eq: snapshotId }
+    };
+
+    // Si on a des entités filtrées, les ajouter au filtre
+    if (filteredEntityIds.length > 0) {
+      orgUnitFilter.public_entity_id = { _in: filteredEntityIds };
+    }
+
+    console.log(`[Etat API Liste] Récupération des org_units du snapshot...`);
+
+    // Récupérer TOUS les org_units du snapshot (avec ou sans filtre d'entités)
+    const allOrgUnitsInSnapshot = await cms.request(readItems(
+      "org_unit",
       {
-        filter: searchFilter,
-        aggregate: { count: "id" },
+        filter: orgUnitFilter,
+        fields: ["public_entity_id"],
+        limit: -1,
       }
     ));
 
-    const total = totalResponse[0]?.count?.id || 0;
+    // Extraire les IDs uniques des entités
+    const uniqueEntityIds = [...new Set((allOrgUnitsInSnapshot as any[]).map(u => u.public_entity_id).filter(Boolean))];
+    const total = uniqueEntityIds.length;
+    console.log(`[Etat API Liste] ${total} entités uniques dans ce snapshot`);
 
-    // Récupérer les entités paginées
+    if (total === 0) {
+      console.log(`[Etat API Liste] Aucune entité trouvée`);
+      return {
+        entities: [],
+        total: 0,
+        page,
+        pageSize: PAGE_SIZE,
+        snapshot: snapshot as OrgSnapshot,
+      };
+    }
+
+    // Paginer les IDs
+    const startIndex = (page - 1) * PAGE_SIZE;
+    const endIndex = startIndex + PAGE_SIZE;
+    const pageEntityIds = uniqueEntityIds.slice(startIndex, endIndex);
+
+    console.log(`[Etat API Liste] Page ${page}: ${pageEntityIds.length} entités`);
+
+    // Récupérer les entités complètes pour cette page
     const entities = await cms.request(readItems(
       "public_entity",
       {
-        filter: searchFilter,
+        filter: { id: { _in: pageEntityIds } },
         fields: ["*"],
         sort: ["nom_canonique"],
-        limit: PAGE_SIZE,
-        offset: (page - 1) * PAGE_SIZE,
       }
     ));
 
-    console.log(`[Etat API Liste] ${entities.length} entités trouvées (total: ${total})`);
+    console.log(`[Etat API Liste] ${(entities as any[]).length} entités récupérées pour la page`);
+
+    // Récupérer les org_units pour ces entités dans ce snapshot
+    const currentUnitMap = new Map();
+    if (pageEntityIds.length > 0) {
+      const pageOrgUnits = await cms.request(readItems(
+        "org_unit",
+        {
+          filter: {
+            public_entity_id: { _in: pageEntityIds },
+            snapshot_id: { _eq: snapshotId }
+          },
+          fields: ["id", "public_entity_id", "intitule_officiel", "parent_id", "snapshot_id"],
+        }
+      ));
+
+      // Garder seulement le premier org_unit par entité
+      (pageOrgUnits as any[]).forEach(unit => {
+        if (!currentUnitMap.has(unit.public_entity_id)) {
+          currentUnitMap.set(unit.public_entity_id, unit);
+        }
+      });
+    }
 
     // Récupérer les org_types séparément
     const orgTypeIds = [...new Set((entities as any[]).map(e => e.org_type_id).filter(Boolean))];
@@ -114,27 +208,10 @@ export default defineCachedEventHandler(async (event): Promise<ListeResponse> =>
       });
     }
 
-    // Récupérer les org_units pour ces entités dans le snapshot actif
-    const entityIds = (entities as any[]).map(e => e.id);
-    const orgUnitsMap = new Map<string, any>();
+    // orgUnitsMap est maintenant currentUnitMap (renommer pour la compatibilité avec le reste du code)
+    const orgUnitsMap = currentUnitMap;
 
-    if (entityIds.length > 0) {
-      console.log(`[Etat API Liste] Récupération des org_units pour ${entityIds.length} entités...`);
-      const orgUnits = await cms.request(readItems(
-        "org_unit",
-        {
-          filter: {
-            public_entity_id: { _in: entityIds },
-            snapshot_id: { _eq: snapshotId }
-          },
-          fields: ["id", "public_entity_id", "intitule_officiel", "parent_id", "snapshot_id"],
-        }
-      ));
-
-      (orgUnits as any[]).forEach((unit) => {
-        orgUnitsMap.set(unit.public_entity_id, unit);
-      });
-    }
+    console.log(`[Etat API Liste] ${orgUnitsMap.size} org_units mappés pour cette page`);
 
     // Récupérer TOUS les org_units pour construire le chemin (1 seule requête)
     console.log(`[Etat API Liste] Récupération de tous les org_units du snapshot...`);
