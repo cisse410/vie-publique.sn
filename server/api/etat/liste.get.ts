@@ -253,10 +253,52 @@ export default defineCachedEventHandler(async (event): Promise<ListeResponse> =>
       return path;
     };
 
+    // Récupérer le snapshot précédent pour comparaison
+    console.log(`[Etat API Liste] Recherche du snapshot précédent...`);
+    const previousSnapshot = await cms.request(readItems(
+      "org_snapshot",
+      {
+        filter: {
+          annee: { _lt: snapshot.annee },
+          status: { _eq: "published" },
+        },
+        sort: ["-annee"],
+        limit: 1,
+      }
+    ));
+
+    let previousUnits: any[] = [];
+    if (previousSnapshot && previousSnapshot.length > 0) {
+      console.log(`[Etat API Liste] Snapshot précédent trouvé: ${previousSnapshot[0].numero}`);
+      previousUnits = await cms.request(readItems(
+        "org_unit",
+        {
+          filter: { snapshot_id: { _eq: previousSnapshot[0].id } },
+          fields: [
+            "id",
+            "public_entity_id",
+            "parent_id",
+            "intitule_officiel",
+          ],
+          limit: -1,
+        }
+      )) as any[];
+    }
+
+    // Comparer avec le snapshot précédent pour détecter les changements
+    const currentUnitsForComparison = Array.from(orgUnitsMap.values());
+    const unitsWithChanges = compareSnapshots(currentUnitsForComparison as any[], previousUnits);
+
+    // Créer une map des changements par public_entity_id
+    const changesMap = new Map(
+      unitsWithChanges.map(u => [u.public_entity_id, { badge: u.badge, changeDetails: u.changeDetails }])
+    );
+
     // Composer les entités finales
     const finalEntities = (entities as any[]).map((entity) => {
       const currentUnit = orgUnitsMap.get(entity.id);
       const orgType = orgTypesMap.get(entity.org_type_id);
+      const changes = changesMap.get(entity.id);
 
       // Construire le chemin complet des parents
       const parentPath = currentUnit?.id ? buildParentPath(currentUnit.id) : [];
@@ -278,6 +320,8 @@ export default defineCachedEventHandler(async (event): Promise<ListeResponse> =>
         current_unit: currentUnit,
         parent_name: parentName,
         parents: parentPath,
+        badge: changes?.badge,
+        changeDetails: changes?.changeDetails,
       };
     });
 
@@ -287,6 +331,7 @@ export default defineCachedEventHandler(async (event): Promise<ListeResponse> =>
       page,
       pageSize: PAGE_SIZE,
       snapshot: snapshot as OrgSnapshot,
+      previousSnapshot: previousSnapshot?.[0] as OrgSnapshot | undefined,
     };
   } catch (error: any) {
     console.error("[Etat API Liste] ERREUR:", {

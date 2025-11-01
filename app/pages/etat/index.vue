@@ -106,6 +106,13 @@ const hasError = computed(() => {
         :current-snapshot-id="snapshotId"
       />
 
+      <!-- Statistiques de changements (uniquement en vue arborescence) -->
+      <EtatStats
+        v-if="currentView === 'arborescence' && arborescenceData?.stats"
+        :stats="arborescenceData.stats"
+        :previous-snapshot="arborescenceData.previousSnapshot"
+      />
+
       <!-- View Switcher -->
       <div class="flex items-center gap-2">
         <UButton
@@ -127,11 +134,19 @@ const hasError = computed(() => {
       </div>
 
       <!-- Vue Arborescence -->
-      <EtatArborescence
-        v-if="currentView === 'arborescence'"
-        :tree="arborescenceData?.tree || []"
-        :loading="arborescencePending"
-      />
+      <div v-if="currentView === 'arborescence'" class="space-y-6">
+        <!-- Entités supprimées -->
+        <EtatDeletedUnits
+          v-if="arborescenceData?.deletedUnits"
+          :deleted-units="arborescenceData.deletedUnits"
+        />
+
+        <!-- Arbre -->
+        <EtatArborescence
+          :tree="arborescenceData?.tree || []"
+          :loading="arborescencePending"
+        />
+      </div>
 
       <!-- Vue Liste -->
       <EtatListe

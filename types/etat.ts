@@ -93,17 +93,50 @@ export interface EntityAlias {
 }
 
 /**
+ * Types de changements détectables entre snapshots
+ */
+export type ChangeType =
+  | "Nouveau"        // Nouvelle entité qui n'existait pas avant
+  | "Supprimé"       // Entité qui existait avant mais n'existe plus
+  | "Renommé"        // Même entité, même parent, mais nom différent
+  | "Transféré"      // Même entité, même nom, mais parent différent
+  | "Renommé + Transféré"  // Même entité, nom ET parent différents
+  | "Inchangé"       // Aucun changement
+  | null;
+
+/**
+ * Détails du changement pour affichage
+ */
+export interface ChangeDetails {
+  type: ChangeType;
+  previousName?: string;      // Nom dans le snapshot précédent
+  previousParent?: string;    // ID du parent précédent
+  previousParentName?: string; // Nom du parent précédent
+  description?: string;        // Description textuelle du changement
+}
+
+/**
  * Types pour les réponses API
  */
 
 export interface OrgUnitWithComparison extends OrgUnit {
-  badge?: "Nouveau" | "Modifié" | "Supprimé" | null;
+  badge?: ChangeType;
+  changeDetails?: ChangeDetails;
 }
 
 export interface ArborescenceResponse {
   snapshot: OrgSnapshot;
   tree: OrgUnitWithComparison[];
   previousSnapshot?: OrgSnapshot;
+  deletedUnits?: OrgUnitWithComparison[];  // Entités supprimées dans ce snapshot
+  stats?: {
+    total: number;
+    nouveaux: number;
+    renommes: number;
+    transferes: number;
+    supprimes: number;
+    inchanges: number;
+  };
 }
 
 export interface ListeResponse {
@@ -111,11 +144,14 @@ export interface ListeResponse {
     current_unit?: OrgUnit;
     parent_name?: string;
     parents?: string[]; // Chemin complet des parents
+    badge?: ChangeType;
+    changeDetails?: ChangeDetails;
   })[];
   total: number;
   page: number;
   pageSize: number;
   snapshot: OrgSnapshot;
+  previousSnapshot?: OrgSnapshot;
 }
 
 export interface SnapshotsListResponse {

@@ -160,31 +160,38 @@ export default defineCachedEventHandler(
               "parent_id",
               "intitule_officiel",
             ],
+            limit: -1,  // ✅ Récupérer TOUTES les entités
           }
         )) as any[];
       }
 
-      // Ajouter les badges de comparaison
-      const unitsWithBadges: OrgUnitWithComparison[] = (
-        orgUnitsWithRelations as any[]
-      ).map((unit: any) => {
-        const prevUnit = previousUnits.find(
-          (p) => p.public_entity_id === unit.public_entity_id
-        );
+      // Ajouter les badges de comparaison avec la nouvelle logique
+      // const { compareSnapshots, findDeletedUnits } = await import("~/server/utils/snapshot-comparison");
 
-        let badge: "Nouveau" | "Modifié" | null = null;
+      const unitsWithBadges: OrgUnitWithComparison[] = compareSnapshots(
+        orgUnitsWithRelations as any[],
+        previousUnits
+      ) as OrgUnitWithComparison[];
 
-        if (!prevUnit) {
-          badge = "Nouveau";
-        } else if (
-          prevUnit.intitule_officiel !== unit.intitule_officiel ||
-          prevUnit.parent_id !== unit.parent_id
-        ) {
-          badge = "Modifié";
-        }
+      // Récupérer les entités supprimées
+      const deletedUnits = findDeletedUnits(
+        orgUnitsWithRelations as any[],
+        previousUnits
+      ) as OrgUnitWithComparison[];
 
-        return { ...unit, badge };
-      });
+      console.log(`[Etat API] ${deletedUnits.length} entités supprimées détectées`);
+
+      // Calculer les statistiques
+      const stats = {
+        total: unitsWithBadges.length,
+        nouveaux: unitsWithBadges.filter((u) => u.badge === "Nouveau").length,
+        renommes: unitsWithBadges.filter((u) => u.badge === "Renommé").length,
+        transferes: unitsWithBadges.filter((u) => u.badge === "Transféré").length,
+        supprimes: deletedUnits.length,
+        inchanges: unitsWithBadges.filter((u) => u.badge === "Inchangé").length,
+      };
+
+      console.log(`[Etat API] Statistiques:`, stats);
 
       // Construire l'arbre hiérarchique
       function buildTree(units: OrgUnitWithComparison[], parentId: string | null = null): OrgUnitWithComparison[] {
@@ -203,6 +210,8 @@ export default defineCachedEventHandler(
         snapshot: snapshot as OrgSnapshot,
         tree,
         previousSnapshot: previousSnapshot?.[0] as OrgSnapshot | undefined,
+        deletedUnits,
+        stats,
       };
     } catch (error: any) {
       console.error("[Etat API] ERREUR:", {

@@ -20,9 +20,22 @@ const indentClass = computed(() => {
 // Badge color selon le statut
 const getBadgeColor = (badge?: string) => {
   if (badge === 'Nouveau') return 'green'
-  if (badge === 'Modifié') return 'orange'
+  if (badge === 'Renommé') return 'blue'
+  if (badge === 'Transféré') return 'purple'
+  if (badge === 'Renommé + Transféré') return 'orange'
   if (badge === 'Supprimé') return 'red'
+  if (badge === 'Inchangé') return 'gray'
   return 'gray'
+}
+
+// Icône pour chaque type de changement
+const getBadgeIcon = (badge?: string) => {
+  if (badge === 'Nouveau') return 'i-heroicons-plus-circle'
+  if (badge === 'Renommé') return 'i-heroicons-pencil'
+  if (badge === 'Transféré') return 'i-heroicons-arrow-right-circle'
+  if (badge === 'Renommé + Transféré') return 'i-heroicons-arrows-right-left'
+  if (badge === 'Supprimé') return 'i-heroicons-x-circle'
+  return undefined
 }
 
 // Vérifier si le nœud a des enfants
@@ -87,15 +100,29 @@ const isChildExpanded = (nodeId: string) => expandedNodes.value.has(nodeId)
       </div>
 
       <!-- Badge de comparaison -->
-      <!-- <div v-if="node.badge" class="flex-shrink-0">
+      <div v-if="node.badge && node.badge !== 'Inchangé'" class="flex-shrink-0">
+        <UTooltip v-if="node.changeDetails?.description" :text="node.changeDetails.description">
+          <UBadge
+            :color="getBadgeColor(node.badge)"
+            variant="subtle"
+            size="xs"
+            :ui="{ rounded: 'rounded-full' }"
+          >
+            <UIcon v-if="getBadgeIcon(node.badge)" :name="getBadgeIcon(node.badge)" class="w-3 h-3" />
+            {{ node.badge }}
+          </UBadge>
+        </UTooltip>
         <UBadge
+          v-else
           :color="getBadgeColor(node.badge)"
           variant="subtle"
           size="xs"
+          :ui="{ rounded: 'rounded-full' }"
         >
+          <UIcon v-if="getBadgeIcon(node.badge)" :name="getBadgeIcon(node.badge)" class="w-3 h-3" />
           {{ node.badge }}
         </UBadge>
-      </div> -->
+      </div>
 
       <!-- Children count -->
       <div v-if="hasChildren" class="flex-shrink-0">

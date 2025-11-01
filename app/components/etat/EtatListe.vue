@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import type { PublicEntity, OrgType, OrgUnit } from '../../../types/etat'
+import type { PublicEntity, OrgType, OrgUnit, ChangeType, ChangeDetails } from '../../../types/etat'
 
 interface EntityWithParent extends PublicEntity {
   current_unit?: OrgUnit
   parent_name?: string
   parents?: string[]
+  badge?: ChangeType
+  changeDetails?: ChangeDetails
 }
 
 interface Props {
@@ -23,6 +25,27 @@ const props = withDefaults(defineProps<Props>(), {
 
 const router = useRouter()
 const route = useRoute()
+
+// Badge color selon le statut
+const getBadgeColor = (badge?: ChangeType) => {
+  if (badge === 'Nouveau') return 'green'
+  if (badge === 'Renommé') return 'blue'
+  if (badge === 'Transféré') return 'purple'
+  if (badge === 'Renommé + Transféré') return 'orange'
+  if (badge === 'Supprimé') return 'red'
+  if (badge === 'Inchangé') return 'gray'
+  return 'gray'
+}
+
+// Icône pour chaque type de changement
+const getBadgeIcon = (badge?: ChangeType) => {
+  if (badge === 'Nouveau') return 'i-heroicons-plus-circle'
+  if (badge === 'Renommé') return 'i-heroicons-pencil'
+  if (badge === 'Transféré') return 'i-heroicons-arrow-right-circle'
+  if (badge === 'Renommé + Transféré') return 'i-heroicons-arrows-right-left'
+  if (badge === 'Supprimé') return 'i-heroicons-x-circle'
+  return undefined
+}
 
 // État local pour la recherche et les filtres
 const searchQuery = ref((route.query.search as string) || '')
@@ -189,11 +212,24 @@ const hasFilters = computed(() => searchQuery.value || selectedTypeId.value)
           <!-- Content -->
           <div class="flex-grow min-w-0">
             <div class="flex items-start justify-between gap-2">
-              <div class="min-w-0">
+              <div class="min-w-0 flex-grow">
                 <h3 class="text-base font-semibold text-gray-900 dark:text-white">
                   {{ entity.nom_canonique }}
                 </h3>
                 <div class="flex items-center gap-2 mt-2 flex-wrap">
+                  <!-- Badge de changement -->
+                  <UTooltip v-if="entity.badge && entity.badge !== 'Inchangé' && entity.changeDetails?.description" :text="entity.changeDetails.description">
+                    <UBadge
+                      :color="getBadgeColor(entity.badge)"
+                      variant="subtle"
+                      size="sm"
+                      :ui="{ rounded: 'rounded-full' }"
+                    >
+                      <UIcon v-if="getBadgeIcon(entity.badge)" :name="getBadgeIcon(entity.badge)" class="w-3 h-3" />
+                      {{ entity.badge }}
+                    </UBadge>
+                  </UTooltip>
+
                   <!-- Afficher tous les parents dans des badges séparés -->
                   <UBadge
                     v-for="(parent, index) in entity.parents"
