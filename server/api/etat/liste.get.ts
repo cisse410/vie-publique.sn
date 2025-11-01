@@ -23,17 +23,56 @@ export default defineCachedEventHandler(async (event): Promise<ListeResponse> =>
   const searchTerm = (query.search as string) || "";
   const typeFilter = query.type as string | undefined;
   const page = parseInt((query.page as string) || "1", 10);
-  let snapshotId = query.snapshot_id as string | undefined;
+
+  // Récupérer le numero ou snapshot_id depuis les query params (backward compatibility)
+  const snapshotNumero = query.decret as string | undefined || query.snapshot as string | undefined;
+  const snapshotIdLegacy = query.snapshot_id as string | undefined;
+
+  let snapshot: any;
 
   try {
-    // Si pas de snapshot_id, prendre le snapshot actif
-    if (!snapshotId) {
+    // Stratégie 1: Chercher par numero (SEO-friendly)
+    if (snapshotNumero) {
+      console.log(`[Etat API Liste] Recherche du snapshot par numero: ${snapshotNumero}`);
+      const snapshots = await cms.request(readItems(
+        "org_snapshot",
+        {
+          filter: { numero: { _eq: snapshotNumero } },
+          limit: 1,
+          fields: ["id", "numero", "annee", "titre"],
+        }
+      ));
+
+      if (!snapshots || snapshots.length === 0) {
+        throw createError({
+          statusCode: 404,
+          message: `Snapshot ${snapshotNumero} non trouvé`,
+        });
+      }
+
+      snapshot = snapshots[0];
+      console.log(`[Etat API Liste] Snapshot trouvé: ${snapshot.numero} (${snapshot.id})`);
+    }
+    // Stratégie 2: Chercher par ID (backward compatibility)
+    else if (snapshotIdLegacy) {
+      console.log(`[Etat API Liste] Recherche du snapshot par ID (legacy): ${snapshotIdLegacy}`);
+      snapshot = await cms.request(readItem(
+        "org_snapshot",
+        snapshotIdLegacy,
+        {
+          fields: ["id", "numero", "annee", "titre"],
+        }
+      ));
+    }
+    // Stratégie 3: Prendre le snapshot actif
+    else {
       console.log("[Etat API Liste] Recherche du snapshot actif...");
       const activeSnapshot = await cms.request(readItems(
         "org_snapshot",
         {
           filter: { est_actif: { _eq: true } },
           limit: 1,
+          fields: ["id", "numero", "annee", "titre"],
         }
       ));
 
@@ -45,18 +84,11 @@ export default defineCachedEventHandler(async (event): Promise<ListeResponse> =>
         });
       }
 
-      snapshotId = activeSnapshot[0].id;
-      console.log(`[Etat API Liste] Snapshot actif: ${snapshotId}`);
+      snapshot = activeSnapshot[0];
+      console.log(`[Etat API Liste] Snapshot actif: ${snapshot.numero} (${snapshot.id})`);
     }
 
-    // Récupérer le snapshot
-    console.log(`[Etat API Liste] Récupération snapshot ${snapshotId}...`);
-    const snapshot = await cms.request(readItem("org_snapshot",
-      snapshotId as string, // Type assertion car on a vérifié que snapshotId existe
-      {
-        fields: ["id", "numero", "annee", "titre"],
-      }
-    ));
+    const snapshotId = snapshot.id;
 
     // Construire le filtre pour la recherche
     const searchFilter: any = {};
@@ -364,8 +396,8 @@ export default defineCachedEventHandler(async (event): Promise<ListeResponse> =>
   maxAge: 60 * 5, // Cache 5 minutes
   getKey: (event) => {
     const query = getQuery(event);
-    // Générer une clé unique basée sur tous les query params
-    const key = `etat-liste:${query.snapshot_id || 'active'}:${query.search || ''}:${query.type || 'all'}:${query.page || '1'}`;
+    // Générer une clé unique basée sur le numero (SEO) ou snapshot_id (legacy) ou 'active'
+    const key = `etat-liste:${query.decret || query.snapshot || query.snapshot_id || 'active'}:${query.search || ''}:${query.type || 'all'}:${query.page || '1'}`;
     return key;
   }
 });

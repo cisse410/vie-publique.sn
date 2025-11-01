@@ -8,11 +8,12 @@
 import type { Ref } from 'vue'
 import type { ArborescenceResponse } from "../../../types/etat"
 
-export const useEtatArborescence = (snapshotId?: Ref<string | undefined>) => {
+export const useEtatArborescence = (snapshotNumero?: Ref<string | undefined>) => {
   const query = computed(() => {
     const params: Record<string, any> = {};
-    if (snapshotId?.value) {
-      params.snapshot_id = snapshotId.value;
+    if (snapshotNumero?.value) {
+      // Utiliser le param 'decret' pour le SEO
+      params.decret = snapshotNumero.value;
     }
     return params;
   });

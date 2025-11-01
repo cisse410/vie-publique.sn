@@ -19,18 +19,79 @@ export default defineCachedEventHandler(
     const cms = getEtatCmsClient()
     const query = getQuery(event)
 
-    // Récupérer le snapshot_id depuis les query params
-    let snapshotId = query.snapshot_id as string | undefined;
+    // Récupérer le numero ou snapshot_id depuis les query params (backward compatibility)
+    const snapshotNumero = query.decret as string | undefined || query.snapshot as string | undefined;
+    const snapshotIdLegacy = query.snapshot_id as string | undefined;
+
+    let snapshot: any;
 
     try {
-      // Si pas de snapshot_id, prendre le snapshot actif
-      if (!snapshotId) {
+      // Stratégie 1: Chercher par numero (SEO-friendly)
+      if (snapshotNumero) {
+        console.log(`[Etat API] Recherche du snapshot par numero: ${snapshotNumero}`);
+        const snapshots = await cms.request(readItems(
+          "org_snapshot",
+          {
+            filter: { numero: { _eq: snapshotNumero } },
+            limit: 1,
+            fields: [
+              "id",
+              "numero",
+              "annee",
+              "date_publication",
+              "titre",
+              "status",
+              "est_actif",
+            ],
+          }
+        ));
+
+        if (!snapshots || snapshots.length === 0) {
+          throw createError({
+            statusCode: 404,
+            message: `Snapshot ${snapshotNumero} non trouvé`,
+          });
+        }
+
+        snapshot = snapshots[0];
+        console.log(`[Etat API] Snapshot trouvé: ${snapshot.numero} (${snapshot.id})`);
+      }
+      // Stratégie 2: Chercher par ID (backward compatibility)
+      else if (snapshotIdLegacy) {
+        console.log(`[Etat API] Recherche du snapshot par ID (legacy): ${snapshotIdLegacy}`);
+        snapshot = await cms.request(readItem(
+          "org_snapshot",
+          snapshotIdLegacy,
+          {
+            fields: [
+              "id",
+              "numero",
+              "annee",
+              "date_publication",
+              "titre",
+              "status",
+              "est_actif",
+            ],
+          }
+        ));
+      }
+      // Stratégie 3: Prendre le snapshot actif
+      else {
         console.log("[Etat API] Recherche du snapshot actif...");
         const activeSnapshot = await cms.request(readItems(
           "org_snapshot",
           {
             filter: { est_actif: { _eq: true } },
             limit: 1,
+            fields: [
+              "id",
+              "numero",
+              "annee",
+              "date_publication",
+              "titre",
+              "status",
+              "est_actif",
+            ],
           }
         ));
 
@@ -42,27 +103,11 @@ export default defineCachedEventHandler(
           });
         }
 
-        snapshotId = activeSnapshot[0].id;
-        console.log(`[Etat API] Snapshot actif: ${snapshotId}`);
+        snapshot = activeSnapshot[0];
+        console.log(`[Etat API] Snapshot actif: ${snapshot.numero} (${snapshot.id})`);
       }
 
-      // Récupérer le snapshot courant
-      console.log(`[Etat API] Récupération snapshot ${snapshotId}...`);
-      const snapshot = await cms.request(readItem(
-        "org_snapshot",
-        snapshotId as string, // Type assertion car on a vérifié que snapshotId existe
-        {
-          fields: [
-            "id",
-            "numero",
-            "annee",
-            "date_publication",
-            "titre",
-            "status",
-            "est_actif",
-          ],
-        }
-      ));
+      const snapshotId = snapshot.id;
 
       // Récupérer toutes les org_units de ce snapshot
       console.log(`[Etat API] Récupération org_units...`);
@@ -166,8 +211,6 @@ export default defineCachedEventHandler(
       }
 
       // Ajouter les badges de comparaison avec la nouvelle logique
-      // const { compareSnapshots, findDeletedUnits } = await import("~/server/utils/snapshot-comparison");
-
       const unitsWithBadges: OrgUnitWithComparison[] = compareSnapshots(
         orgUnitsWithRelations as any[],
         previousUnits
@@ -243,8 +286,8 @@ export default defineCachedEventHandler(
     maxAge: 60 * 10, // Cache 10 minutes
     getKey: (event) => {
       const query = getQuery(event);
-      // Générer une clé unique basée sur le snapshot_id
-      const key = `etat-arborescence:${query.snapshot_id || 'active'}`;
+      // Générer une clé unique basée sur le numero (SEO) ou snapshot_id (legacy) ou 'active'
+      const key = `etat-arborescence:${query.decret || query.snapshot || query.snapshot_id || 'active'}`;
       return key;
     }
   }

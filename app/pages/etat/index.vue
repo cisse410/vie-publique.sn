@@ -40,8 +40,8 @@ useSeoMeta({
 // Vue active (arborescence ou liste)
 const currentView = computed(() => (route.query.view as string) || 'arborescence')
 
-// Snapshot ID depuis les query params
-const snapshotId = computed(() => route.query.snapshot_id as string | undefined)
+// Snapshot numero depuis les query params (SEO-friendly)
+const snapshotNumero = computed(() => route.query.decret as string | undefined || route.query.snapshot as string | undefined)
 const searchQuery = computed(() => route.query.search as string | undefined)
 const typeQuery = computed(() => route.query.type as string | undefined)
 const pageQuery = computed(() => parseInt((route.query.page as string) || '1', 10))
@@ -55,11 +55,11 @@ const { data: snapshotsData, pending: snapshotsPending } = useEtatSnapshots()
 const { data: typesData, pending: typesPending } = useEtatTypes()
 
 // 3. Charger l'arborescence via composable (uniquement si vue = arborescence)
-const { data: arborescenceData, pending: arborescencePending } = useEtatArborescence(snapshotId)
+const { data: arborescenceData, pending: arborescencePending } = useEtatArborescence(snapshotNumero)
 
 // 4. Charger la liste via composable (uniquement si vue = liste)
 const { data: listeData, pending: listePending } = useEtatListe({
-  snapshotId,
+  snapshotNumero,
   search: searchQuery,
   type: typeQuery,
   page: pageQuery,
@@ -103,7 +103,7 @@ const hasError = computed(() => {
       <EtatSnapshotSelector
         v-if="snapshotsData?.snapshots"
         :snapshots="snapshotsData.snapshots"
-        :current-snapshot-id="snapshotId"
+        :current-snapshot-numero="snapshotNumero"
       />
 
       <!-- Statistiques de changements (uniquement en vue arborescence) -->

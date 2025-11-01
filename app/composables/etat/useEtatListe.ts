@@ -9,7 +9,7 @@ import type { Ref } from 'vue'
 import type { ListeResponse } from "../../../types/etat"
 
 interface UseEtatListeOptions {
-  snapshotId?: Ref<string | undefined>
+  snapshotNumero?: Ref<string | undefined>
   search?: Ref<string | undefined>
   type?: Ref<string | undefined>
   page?: Ref<number>
@@ -17,7 +17,7 @@ interface UseEtatListeOptions {
 
 export const useEtatListe = (options: UseEtatListeOptions = {}) => {
   const {
-    snapshotId,
+    snapshotNumero,
     search,
     type,
     page = ref(1),
@@ -28,8 +28,9 @@ export const useEtatListe = (options: UseEtatListeOptions = {}) => {
       page: page.value.toString(),
     };
 
-    if (snapshotId?.value) {
-      params.snapshot_id = snapshotId.value;
+    if (snapshotNumero?.value) {
+      // Utiliser le param 'decret' pour le SEO
+      params.decret = snapshotNumero.value;
     }
 
     if (search?.value) {

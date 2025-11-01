@@ -3,7 +3,7 @@ import type { OrgSnapshot } from '../../../types/etat'
 
 interface Props {
   snapshots: OrgSnapshot[]
-  currentSnapshotId?: string
+  currentSnapshotNumero?: string
 }
 
 const props = defineProps<Props>()
@@ -11,21 +11,25 @@ const props = defineProps<Props>()
 const router = useRouter()
 const route = useRoute()
 
-// Sélectionner le snapshot actif par défaut
-const selectedId = ref(props.currentSnapshotId || props.snapshots.find(s => s.est_actif)?.id || '')
+// Sélectionner le snapshot actif par défaut (par numero)
+const selectedNumero = ref(props.currentSnapshotNumero || props.snapshots.find(s => s.est_actif)?.numero || '')
 
-// Synchroniser avec les query params
-watch(selectedId, (newId) => {
-  if (newId) {
-    const query = { ...route.query, snapshot_id: newId }
+// Synchroniser avec les query params (SEO-friendly avec numero)
+watch(selectedNumero, (newNumero) => {
+  if (newNumero) {
+    const query = { ...route.query }
+    // Utiliser le param 'decret' pour le SEO
+    query.decret = newNumero
+    // Supprimer l'ancien param snapshot_id s'il existe
+    delete query.snapshot_id
     router.push({ query })
   }
 })
 
 // Mettre à jour quand les props changent
-watch(() => props.currentSnapshotId, (newId) => {
-  if (newId && newId !== selectedId.value) {
-    selectedId.value = newId
+watch(() => props.currentSnapshotNumero, (newNumero) => {
+  if (newNumero && newNumero !== selectedNumero.value) {
+    selectedNumero.value = newNumero
   }
 })
 
@@ -43,22 +47,22 @@ const activeSnapshot = computed(() => props.snapshots.find(s => s.est_actif))
 
       <div class="flex-grow">
         <USelectMenu
-          v-model="selectedId"
+          v-model="selectedNumero"
           :options="snapshots"
-          value-attribute="id"
+          value-attribute="numero"
           option-attribute="numero"
           searchable
           searchable-placeholder="Rechercher un décret..."
           class="w-full"
         >
           <template #label>
-            <div v-if="selectedId" class="flex items-center gap-2">
-              <UBadge v-if="selectedId === activeSnapshot?.id" color="green" variant="subtle">
+            <div v-if="selectedNumero" class="flex items-center gap-2">
+              <UBadge v-if="selectedNumero === activeSnapshot?.numero" color="green" variant="subtle">
                 Actif
               </UBadge>
-              <span>Décret {{ snapshots.find(s => s.id === selectedId)?.numero }}</span>
+              <span>Décret {{ snapshots.find(s => s.numero === selectedNumero)?.numero }}</span>
               <span class="text-gray-500 text-sm">
-                ({{ snapshots.find(s => s.id === selectedId)?.annee }})
+                ({{ snapshots.find(s => s.numero === selectedNumero)?.annee }})
               </span>
             </div>
             <span v-else class="text-gray-500">Sélectionner un décret</span>
@@ -80,9 +84,9 @@ const activeSnapshot = computed(() => props.snapshots.find(s => s.est_actif))
         </USelectMenu>
       </div>
 
-      <div v-if="snapshots.find(s => s.id === selectedId)?.document_url" class="flex-shrink-0">
+      <div v-if="snapshots.find(s => s.numero === selectedNumero)?.document_url" class="flex-shrink-0">
         <UButton
-          :to="snapshots.find(s => s.id === selectedId)?.document_url"
+          :to="snapshots.find(s => s.numero === selectedNumero)?.document_url"
           target="_blank"
           icon="i-heroicons-document-text"
           variant="soft"
