@@ -11,7 +11,6 @@ export interface OrgType {
   code: string; // "MINISTERE", "DIRECTION", "EP", etc.
   label: string; // "Ministère", "Direction", etc.
   ordre: number;
-  icon?: string; // Emoji ou classe CSS
 }
 
 /**
@@ -47,6 +46,13 @@ export interface PublicEntity {
   email?: string;
   telephone?: string;
   adresse?: string;
+  reseaux_sociaux?: {
+    facebook?: string;
+    twitter?: string;
+    linkedin?: string;
+    instagram?: string;
+    youtube?: string;
+  };
   date_created?: string;
   date_updated?: string;
 
@@ -161,6 +167,18 @@ export interface SnapshotsListResponse {
 
 export interface TypesResponse {
   types: OrgType[];
+}
+
+export interface EntityDetailResponse {
+  entity: PublicEntity & { org_type?: OrgType };
+  snapshot: OrgSnapshot;
+  currentUnits: (OrgUnit & { parent?: OrgUnit | null })[];
+  childUnits: (OrgUnit & { public_entity?: PublicEntity })[];
+  history: {
+    snapshot: OrgSnapshot;
+    units: OrgUnit[];
+    present: boolean;
+  }[];
 }
 
 /**

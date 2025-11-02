@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { OrgUnitWithComparison } from '../../../types/etat'
+import { hasDetailPage } from '~/utils/etat-helpers'
 
 interface Props {
   node: OrgUnitWithComparison
@@ -11,6 +12,8 @@ const props = defineProps<Props>()
 const emit = defineEmits<{
   toggle: [nodeId: string]
 }>()
+
+const route = useRoute()
 
 // Calculer l'indentation
 const indentClass = computed(() => {
@@ -81,17 +84,19 @@ const isChildExpanded = (nodeId: string) => expandedNodes.value.has(nodeId)
 
       <!-- Type icon -->
       <div class="flex-shrink-0">
-        <UIcon
-          v-if="node.public_entity?.org_type?.icon"
-          :name="node.public_entity.org_type.icon"
-          class="text-primary-500"
-        />
-        <UIcon v-else name="i-heroicons-building-office" class="text-gray-400" />
+        <UIcon name="i-heroicons-building-office" class="text-gray-400" />
       </div>
 
       <!-- Node title -->
       <div class="flex-grow">
-        <span class="text-sm font-medium text-gray-900 dark:text-white">
+        <NuxtLink
+          v-if="node.public_entity?.slug && hasDetailPage(node.public_entity?.org_type?.code)"
+          :to="`/etat/${node.public_entity.slug}${route.query.decret ? `?decret=${route.query.decret}` : ''}`"
+          class="text-sm font-medium text-gray-900 dark:text-white hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+        >
+          {{ node.intitule_officiel }}
+        </NuxtLink>
+        <span v-else class="text-sm font-medium text-gray-900 dark:text-white">
           {{ node.intitule_officiel }}
         </span>
         <span v-if="node.public_entity?.org_type?.label" class="text-xs text-gray-500 dark:text-gray-400 ml-2">

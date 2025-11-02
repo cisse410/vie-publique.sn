@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { PublicEntity, OrgType, OrgUnit, ChangeType, ChangeDetails } from '../../../types/etat'
+import { hasDetailPage } from '~/utils/etat-helpers'
 
 interface EntityWithParent extends PublicEntity {
   current_unit?: OrgUnit
@@ -49,19 +50,40 @@ const getBadgeIcon = (badge?: ChangeType) => {
 
 // État local pour la recherche et les filtres
 const searchQuery = ref((route.query.search as string) || '')
-const selectedTypeId = ref((route.query.type as string) || '')
+
+// Initialiser selectedTypeCode en gérant à la fois le code et l'ID (backward compatibility)
+const initTypeCode = () => {
+  const queryType = route.query.type as string | undefined
+  if (!queryType) return ''
+
+  // Essayer de trouver par code
+  const typeByCode = props.orgTypes.find(t => t.code === queryType)
+  if (typeByCode) return typeByCode.code
+
+  // Fallback: chercher par ID (ancien format)
+  const typeById = props.orgTypes.find(t => t.id === queryType)
+  if (typeById) return typeById.code
+
+  // Si rien n'est trouvé, retourner la valeur brute (le backend fera le fallback)
+  return queryType
+}
+
+const selectedTypeCode = ref(initTypeCode())
 const currentPage = ref(props.page)
 
-// Type sélectionné (objet complet pour USelectMenu)
-const selectedType = computed({
-  get: () => {
-    if (!selectedTypeId.value) return { id: '', label: 'Tous les types' }
-    return props.orgTypes.find(t => t.id === selectedTypeId.value) || { id: '', label: 'Tous les types' }
-  },
-  set: (value) => {
-    selectedTypeId.value = value?.id || ''
+// Surveiller les changements de types (quand ils sont chargés) ou de query params
+watch(() => [props.orgTypes, route.query.type] as const, () => {
+  const newCode = initTypeCode()
+  if (newCode !== selectedTypeCode.value) {
+    selectedTypeCode.value = newCode
   }
-})
+}, { immediate: false })
+
+// Toutes les options incluant "Tous les types"
+const typeOptions = computed(() => [
+  { code: '', label: 'Tous les types' },
+  ...props.orgTypes
+])
 
 // Calculer le nombre de pages
 const totalPages = computed(() => Math.ceil(props.total / props.pageSize))
@@ -88,8 +110,8 @@ const updateQueryParams = () => {
     delete query.search
   }
 
-  if (selectedTypeId.value) {
-    query.type = selectedTypeId.value
+  if (selectedTypeCode.value) {
+    query.type = selectedTypeCode.value
   } else {
     delete query.type
   }
@@ -101,7 +123,7 @@ const updateQueryParams = () => {
 }
 
 // Watch des changements de filtres
-watch(selectedTypeId, () => {
+watch(selectedTypeCode, () => {
   currentPage.value = 1
   updateQueryParams()
 })
@@ -118,12 +140,12 @@ watch(() => props.page, (newPage) => {
 // Clear filters
 const clearFilters = () => {
   searchQuery.value = ''
-  selectedTypeId.value = ''
+  selectedTypeCode.value = ''
   currentPage.value = 1
   updateQueryParams()
 }
 
-const hasFilters = computed(() => searchQuery.value || selectedTypeId.value)
+const hasFilters = computed(() => searchQuery.value || selectedTypeCode.value)
 </script>
 
 <template>
@@ -154,11 +176,19 @@ const hasFilters = computed(() => searchQuery.value || selectedTypeId.value)
         <!-- Type filter -->
         <div class="w-full sm:w-64">
           <USelectMenu
-            v-model="selectedType"
-            :options="[{ id: '', label: 'Tous les types' }, ...orgTypes]"
-            placeholder="Filtrer par type"
+            v-model="selectedTypeCode"
+            :options="typeOptions"
+            value-attribute="code"
             option-attribute="label"
-          />
+            placeholder="Filtrer par type"
+          >
+            <template #label>
+              <span v-if="selectedTypeCode">
+                {{ typeOptions.find(t => t.code === selectedTypeCode)?.label || 'Filtrer par type' }}
+              </span>
+              <span v-else class="text-gray-500">Tous les types</span>
+            </template>
+          </USelectMenu>
         </div>
 
         <!-- Clear filters -->
@@ -213,7 +243,14 @@ const hasFilters = computed(() => searchQuery.value || selectedTypeId.value)
           <div class="flex-grow min-w-0">
             <div class="flex items-start justify-between gap-2">
               <div class="min-w-0 flex-grow">
-                <h3 class="text-base font-semibold text-gray-900 dark:text-white">
+                <NuxtLink
+                  v-if="entity.slug && hasDetailPage(entity.org_type?.code)"
+                  :to="`/etat/${entity.slug}${route.query.decret ? `?decret=${route.query.decret}` : ''}`"
+                  class="text-base font-semibold text-gray-900 dark:text-white hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                >
+                  {{ entity.nom_canonique }}
+                </NuxtLink>
+                <h3 v-else class="text-base font-semibold text-gray-900 dark:text-white">
                   {{ entity.nom_canonique }}
                 </h3>
                 <div class="flex items-center gap-2 mt-2 flex-wrap">

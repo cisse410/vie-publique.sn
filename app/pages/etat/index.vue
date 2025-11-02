@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { useEtatSnapshots } from '~/composables/etat/useEtatSnapshots'
-import { useEtatTypes } from '~/composables/etat/useEtatTypes'
-import type { OrgType } from '../../../types/etat'
 import { useEtatArborescence } from '~/composables/etat/useEtatArborescence'
 import { useEtatListe } from '~/composables/etat/useEtatListe'
+import { useEtatSnapshots } from '~/composables/etat/useEtatSnapshots'
+import { useEtatTypes } from '~/composables/etat/useEtatTypes'
 
 const { keywords } = useSiteMetadata()
 const route = useRoute()

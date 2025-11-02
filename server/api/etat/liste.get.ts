@@ -29,6 +29,7 @@ export default defineCachedEventHandler(async (event): Promise<ListeResponse> =>
   const snapshotIdLegacy = query.snapshot_id as string | undefined;
 
   let snapshot: any;
+  let snapshotId: string | undefined;
 
   try {
     // Stratégie 1: Chercher par numero (SEO-friendly)
@@ -90,23 +91,56 @@ export default defineCachedEventHandler(async (event): Promise<ListeResponse> =>
 
     const snapshotId = snapshot.id;
 
-    // Construire le filtre pour la recherche
-    const searchFilter: any = {};
-
-    if (searchTerm) {
-      searchFilter.nom_canonique = { _icontains: searchTerm };
-    }
-
+    // Si typeFilter est fourni, on le convertit en ID
+    // Supporte à la fois le code (SEO) et l'ID (backward compatibility)
+    let typeId: string | undefined;
     if (typeFilter) {
-      searchFilter.org_type_id = { _eq: typeFilter };
+      console.log(`[Etat API Liste] Recherche du type avec: ${typeFilter}`);
+
+      // Essayer d'abord par code (SEO-friendly)
+      const typesByCode = await cms.request(readItems(
+        "org_type",
+        {
+          filter: { code: { _eq: typeFilter } },
+          fields: ["id", "code"],
+          limit: 1,
+        }
+      ));
+
+      if (typesByCode && typesByCode.length > 0) {
+        typeId = (typesByCode[0] as any).id;
+        console.log(`[Etat API Liste] Type trouvé par code: ${(typesByCode[0] as any).code} → ID: ${typeId}`);
+      } else {
+        // Fallback: essayer par ID directement (backward compatibility)
+        console.log(`[Etat API Liste] Aucun type trouvé avec le code "${typeFilter}", tentative avec ID...`);
+        try {
+          const typeById = await cms.request(readItems(
+            "org_type",
+            {
+              filter: { id: { _eq: typeFilter } },
+              fields: ["id", "code"],
+              limit: 1,
+            }
+          ));
+
+          if (typeById && typeById.length > 0) {
+            typeId = (typeById[0] as any).id;
+            console.log(`[Etat API Liste] Type trouvé par ID: ${typeId}`);
+          } else {
+            console.warn(`[Etat API Liste] Aucun type trouvé avec "${typeFilter}" (ni code, ni ID)`);
+          }
+        } catch (e) {
+          console.warn(`[Etat API Liste] Erreur lors de la recherche par ID:`, e);
+        }
+      }
     }
 
-    console.log(`[Etat API Liste] Recherche avec: search="${searchTerm}", type=${typeFilter}, page=${page}, snapshot=${snapshotId}`);
+    console.log(`[Etat API Liste] Recherche avec: search="${searchTerm}", type=${typeFilter} (ID: ${typeId}), page=${page}, snapshot=${snapshotId}`);
 
     // APPROCHE SIMPLIFIÉE: Récupérer d'abord les IDs des entités filtrées, puis les org_units
     let filteredEntityIds: string[] = [];
 
-    if (searchTerm || typeFilter) {
+    if (searchTerm || typeId) {
       // Si on a des filtres, d'abord trouver les entités qui matchent
       console.log(`[Etat API Liste] Recherche des entités matchant les critères...`);
 
@@ -114,8 +148,8 @@ export default defineCachedEventHandler(async (event): Promise<ListeResponse> =>
       if (searchTerm) {
         entityFilter.nom_canonique = { _icontains: searchTerm };
       }
-      if (typeFilter) {
-        entityFilter.org_type_id = { _eq: typeFilter };
+      if (typeId) {
+        entityFilter.org_type_id = { _eq: typeId };
       }
 
       const matchingEntities = await cms.request(readItems(
@@ -155,18 +189,46 @@ export default defineCachedEventHandler(async (event): Promise<ListeResponse> =>
 
     console.log(`[Etat API Liste] Récupération des org_units du snapshot...`);
 
-    // Récupérer TOUS les org_units du snapshot (avec ou sans filtre d'entités)
-    const allOrgUnitsInSnapshot = await cms.request(readItems(
-      "org_unit",
-      {
-        filter: orgUnitFilter,
-        fields: ["public_entity_id"],
-        limit: -1,
+    // CORRECTIF: Diviser la requête en lots pour éviter l'erreur 431 "Request Header Fields Too Large"
+    let allOrgUnitsInSnapshot: any[] = [];
+
+    if (filteredEntityIds.length > 0) {
+      // Si on a des entités filtrées, diviser en lots de 100 IDs max
+      const BATCH_SIZE = 100;
+      const batches = Math.ceil(filteredEntityIds.length / BATCH_SIZE);
+      console.log(`[Etat API Liste] Récupération en ${batches} lots de ${BATCH_SIZE} IDs max...`);
+
+      for (let i = 0; i < filteredEntityIds.length; i += BATCH_SIZE) {
+        const batch = filteredEntityIds.slice(i, i + BATCH_SIZE);
+        const batchResults = await cms.request(readItems(
+          "org_unit",
+          {
+            filter: {
+              snapshot_id: { _eq: snapshotId },
+              public_entity_id: { _in: batch }
+            },
+            fields: ["public_entity_id"],
+            limit: -1,
+          }
+        ));
+        allOrgUnitsInSnapshot.push(...(batchResults as any[]));
       }
-    ));
+      console.log(`[Etat API Liste] ${allOrgUnitsInSnapshot.length} org_units récupérés en ${batches} lots`);
+    } else {
+      // Pas de filtre, récupérer tous les org_units du snapshot
+      const results = await cms.request(readItems(
+        "org_unit",
+        {
+          filter: { snapshot_id: { _eq: snapshotId } },
+          fields: ["public_entity_id"],
+          limit: -1,
+        }
+      ));
+      allOrgUnitsInSnapshot = results as any[];
+    }
 
     // Extraire les IDs uniques des entités
-    const uniqueEntityIds = [...new Set((allOrgUnitsInSnapshot as any[]).map(u => u.public_entity_id).filter(Boolean))];
+    const uniqueEntityIds = [...new Set(allOrgUnitsInSnapshot.map(u => u.public_entity_id).filter(Boolean))];
     const total = uniqueEntityIds.length;
     console.log(`[Etat API Liste] ${total} entités uniques dans ce snapshot`);
 
@@ -232,7 +294,7 @@ export default defineCachedEventHandler(async (event): Promise<ListeResponse> =>
         "org_type",
         {
           filter: { id: { _in: orgTypeIds } },
-          fields: ["id", "code", "label", "ordre", "icon"],
+          fields: ["id", "code", "label", "ordre"],
         }
       ));
       orgTypes.forEach((type: any) => {
@@ -319,7 +381,12 @@ export default defineCachedEventHandler(async (event): Promise<ListeResponse> =>
 
     // Comparer avec le snapshot précédent pour détecter les changements
     const currentUnitsForComparison = Array.from(orgUnitsMap.values());
+    console.log(`[Etat API Liste] currentUnitsForComparison type:`, typeof currentUnitsForComparison, `isArray:`, Array.isArray(currentUnitsForComparison), `length:`, currentUnitsForComparison.length);
+    console.log(`[Etat API Liste] previousUnits type:`, typeof previousUnits, `isArray:`, Array.isArray(previousUnits), `length:`, previousUnits?.length);
+
     const unitsWithChanges = compareSnapshots(currentUnitsForComparison as any[], previousUnits);
+
+    console.log(`[Etat API Liste] unitsWithChanges type:`, typeof unitsWithChanges, `isArray:`, Array.isArray(unitsWithChanges), `value:`, unitsWithChanges);
 
     // Créer une map des changements par public_entity_id
     const changesMap = new Map(

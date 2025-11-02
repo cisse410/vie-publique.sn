@@ -17,7 +17,7 @@ export default defineCachedEventHandler(async (): Promise<{ types: OrgType[] }> 
     const types = await cms.request(readItems(
       "org_type",
       {
-        fields: ["id", "code", "label", "ordre", "icon"],
+        fields: ["id", "code", "label", "ordre"],
         sort: ["ordre"],
         limit: -1, // Tous les types
       }

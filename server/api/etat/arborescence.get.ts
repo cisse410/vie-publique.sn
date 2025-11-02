@@ -24,6 +24,7 @@ export default defineCachedEventHandler(
     const snapshotIdLegacy = query.snapshot_id as string | undefined;
 
     let snapshot: any;
+    let snapshotId: string | undefined;
 
     try {
       // Stratégie 1: Chercher par numero (SEO-friendly)
@@ -148,7 +149,7 @@ export default defineCachedEventHandler(
       const orgTypes = await cms.request(readItems(
         "org_type",
         {
-          fields: ["id", "code", "label", "icon"],
+          fields: ["id", "code", "label"],
           limit: -1,
         }
       ));
