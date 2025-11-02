@@ -191,6 +191,30 @@ export default defineCachedEventHandler(
             fields: ["id", "slug", "nom_canonique", "org_type_id"],
           }
         )) as any[]
+
+        // Récupérer les org_types des enfants
+        const childOrgTypeIds = Array.from(new Set(
+          childEntities.map(e => e.org_type_id).filter(Boolean)
+        ))
+
+        let childOrgTypes: any[] = []
+        if (childOrgTypeIds.length > 0) {
+          childOrgTypes = await cms.request(readItems(
+            "org_type",
+            {
+              filter: { id: { _in: childOrgTypeIds } },
+              fields: ["id", "code", "label", "ordre"],
+            }
+          )) as any[]
+        }
+
+        const childOrgTypesMap = new Map(childOrgTypes.map(t => [t.id, t]))
+
+        // Enrichir les childEntities avec leur org_type
+        childEntities = childEntities.map(e => ({
+          ...e,
+          org_type: childOrgTypesMap.get(e.org_type_id)
+        }))
       }
 
       // Créer une map des entités enfants

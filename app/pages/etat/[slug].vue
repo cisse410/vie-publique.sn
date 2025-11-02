@@ -225,81 +225,71 @@ const goBack = () => {
               </h2>
             </template>
 
-            <!-- Tabs -->
-            <UTabs v-model="selectedTab" :items="tabs">
-              <template #item="{ item }">
-                <div class="py-4 space-y-2">
-                  <NuxtLink
-                    v-for="child in currentTabChildren"
-                    :key="child.id"
-                    :to="`/etat/${child.public_entity?.slug}${snapshotNumero ? `?decret=${snapshotNumero}` : ''}`"
-                    class="block p-3 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                  >
-                    <div class="flex items-center justify-between">
-                      <div>
-                        <p class="font-medium text-gray-900 dark:text-white">
-                          {{ child.public_entity?.nom_canonique || child.intitule_officiel }}
-                        </p>
-                        <p v-if="child.public_entity?.org_type?.label" class="text-sm text-gray-600 dark:text-gray-400">
-                          {{ child.public_entity.org_type.label }}
-                        </p>
-                      </div>
-                      <UIcon name="i-heroicons-chevron-right" class="w-5 h-5 text-gray-400" />
-                    </div>
-                  </NuxtLink>
+            <!-- Tabs Navigation -->
+            <div class="border-b border-gray-200 dark:border-gray-700">
+              <nav class="flex gap-4 px-4" aria-label="Tabs">
+                <button
+                  v-for="tab in tabs"
+                  :key="tab.key"
+                  @click="selectedTab = tab.key"
+                  :class="[
+                    selectedTab === tab.key
+                      ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300',
+                    'whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2'
+                  ]"
+                >
+                  {{ tab.label }}
+                  <UBadge v-if="tab.badge" size="xs" color="gray" variant="subtle">
+                    {{ tab.badge }}
+                  </UBadge>
+                </button>
+              </nav>
+            </div>
 
-                  <p v-if="currentTabChildren.length === 0" class="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
-                    Aucune entité dans cette catégorie
-                  </p>
-                </div>
-              </template>
-            </UTabs>
-          </UCard>
-
-          <!-- Historique dans les décrets -->
-          <UCard>
-            <template #header>
-              <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
-                Historique dans les décrets
-              </h2>
-            </template>
-
-            <div class="space-y-3">
-              <div
-                v-for="item in entityData.history"
-                :key="item.snapshot.id"
-                class="flex items-start gap-4 p-4 border border-gray-200 dark:border-gray-700 rounded-lg"
-                :class="{
-                  'bg-primary-50 dark:bg-primary-900/20 border-primary-300 dark:border-primary-700': item.snapshot.id === entityData.snapshot.id
-                }"
+            <!-- Tab Content -->
+            <div class="p-4 space-y-2">
+              <!-- Entité cliquable (avec page de détail) -->
+              <NuxtLink
+                v-for="child in currentTabChildren.filter(c => hasDetailPage(c.public_entity?.org_type?.code))"
+                :key="child.id"
+                :to="`/etat/${child.public_entity?.slug}${snapshotNumero ? `?decret=${snapshotNumero}` : ''}`"
+                class="block p-3 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               >
-                <div class="flex-shrink-0">
-                  <UIcon
-                    :name="item.present ? 'i-heroicons-check-circle' : 'i-heroicons-x-circle'"
-                    :class="item.present ? 'text-green-600' : 'text-red-600'"
-                    class="w-6 h-6"
-                  />
-                </div>
-                <div class="flex-grow min-w-0">
-                  <div class="flex items-center gap-2 mb-1">
+                <div class="flex items-center justify-between">
+                  <div>
                     <p class="font-medium text-gray-900 dark:text-white">
-                      Décret {{ item.snapshot.numero }} ({{ item.snapshot.annee }})
+                      {{ child.public_entity?.nom_canonique || child.intitule_officiel }}
                     </p>
-                    <UBadge
-                      v-if="item.snapshot.id === entityData.snapshot.id"
-                      color="primary"
-                      variant="subtle"
-                      size="xs"
-                    >
-                      Actuel
-                    </UBadge>
+                    <p v-if="child.public_entity?.org_type?.label" class="text-sm text-gray-600 dark:text-gray-400">
+                      {{ child.public_entity.org_type.label }}
+                    </p>
                   </div>
-                  <p class="text-sm text-gray-600 dark:text-gray-400">
-                    {{ item.present ? 'Présent' : 'Absent' }}
-                    {{ item.present && item.units.length > 1 ? ` (${item.units.length} rattachements)` : '' }}
-                  </p>
+                  <UIcon name="i-heroicons-chevron-right" class="w-5 h-5 text-gray-400" />
+                </div>
+              </NuxtLink>
+
+              <!-- Entité non cliquable (sans page de détail) -->
+              <div
+                v-for="child in currentTabChildren.filter(c => !hasDetailPage(c.public_entity?.org_type?.code))"
+                :key="child.id"
+                class="block p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"
+              >
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="font-medium text-gray-900 dark:text-white">
+                      {{ child.public_entity?.nom_canonique || child.intitule_officiel }}
+                    </p>
+                    <p v-if="child.public_entity?.org_type?.label" class="text-sm text-gray-600 dark:text-gray-400">
+                      {{ child.public_entity.org_type.label }}
+                    </p>
+                  </div>
                 </div>
               </div>
+
+              <p v-if="currentTabChildren.length === 0" class="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+                Aucune entité dans cette catégorie
+              </p>
             </div>
           </UCard>
         </div>
@@ -546,52 +536,6 @@ const goBack = () => {
               <p v-if="unit.notes" class="text-sm text-gray-600 dark:text-gray-400 mt-2">
                 {{ unit.notes }}
               </p>
-            </div>
-          </div>
-        </UCard>
-
-        <!-- Historique -->
-        <UCard>
-          <template #header>
-            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
-              Historique dans les décrets
-            </h2>
-          </template>
-
-          <div class="space-y-3">
-            <div
-              v-for="item in entityData.history"
-              :key="item.snapshot.id"
-              class="flex items-start gap-4 p-4 border border-gray-200 dark:border-gray-700 rounded-lg"
-              :class="{
-                'bg-primary-50 dark:bg-primary-900/20 border-primary-300 dark:border-primary-700': item.snapshot.id === entityData.snapshot.id
-              }"
-            >
-              <div class="flex-shrink-0">
-                <UIcon
-                  :name="item.present ? 'i-heroicons-check-circle' : 'i-heroicons-x-circle'"
-                  :class="item.present ? 'text-green-600' : 'text-red-600'"
-                  class="w-6 h-6"
-                />
-              </div>
-              <div class="flex-grow min-w-0">
-                <div class="flex items-center gap-2 mb-1">
-                  <p class="font-medium text-gray-900 dark:text-white">
-                    Décret {{ item.snapshot.numero }} ({{ item.snapshot.annee }})
-                  </p>
-                  <UBadge
-                    v-if="item.snapshot.id === entityData.snapshot.id"
-                    color="primary"
-                    variant="subtle"
-                    size="xs"
-                  >
-                    Actuel
-                  </UBadge>
-                </div>
-                <p class="text-sm text-gray-600 dark:text-gray-400">
-                  {{ item.present ? 'Présent' : 'Absent' }}
-                </p>
-              </div>
             </div>
           </div>
         </UCard>
