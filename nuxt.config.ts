@@ -181,6 +181,11 @@ export default defineNuxtConfig({
     typesenseCollection: process.env.TYPESENSE_COLLECTION,
     cmsApiUrl: process.env.CMS_API_URL,
     cmsApiKey: process.env.CMS_API_KEY,
+
+    // Configuration Directus pour l'État (instance locale)
+    etatCmsApiUrl: process.env.ETAT_CMS_API_URL,
+    etatCmsApiKey: process.env.ETAT_CMS_API_KEY,
+
     bictorysApiKey: process.env.BICTORYS_API_KEY,
     bictorysApiUrl: process.env.BICTORYS_API_URL,
     bictorysWebhookSecret: process.env.BICTORYS_WEBHOOK_SECRET,
@@ -285,6 +290,16 @@ export default defineNuxtConfig({
     },
   },
   css: ['~/assets/css/app.css'],
+  components: [
+    {
+      path: '~/components',
+      pathPrefix: false,
+    },
+    {
+      path: '~/components/AnnuaireEtat',
+      pathPrefix: false, // Permet d'utiliser <TreeView> au lieu de <AnnuaireEtatTreeView>
+    },
+  ],
   colorMode: {
     preference: 'dark', // default value of $nuxt.colorMode.preference
   },

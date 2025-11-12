@@ -1,0 +1,53 @@
+erDiagram
+    entities_types ||--o{ public_entities : "has type"
+    public_entities ||--o{ entity_snapshots : "has snapshots"
+    decree ||--o{ entity_snapshots : "contains"
+    entity_snapshots ||--o{ entity_snapshots : "parent-child"
+
+    entities_types {
+        int id PK
+        string code UK
+        string label
+        boolean can_have_children
+        timestamp date_created
+        timestamp date_updated
+    }
+
+    decree {
+        int id PK
+        string numero UK
+        date date_publication
+        string status
+        string document_url
+        string pr
+        string pm
+        timestamp date_created
+        timestamp date_updated
+    }
+
+    public_entities {
+        int id PK
+        string slug UK
+        string canonical_name
+        int entity_type_id FK
+        boolean has_public_page
+        date first_appearance
+        string web_site
+        string phone
+        string email
+        json reseaux_sociaux
+        timestamp date_created
+        timestamp date_updated
+    }
+
+    entity_snapshots {
+        int id PK
+        int public_entity_id FK
+        int decree_id FK
+        int parent_snapshot_id FK
+        string official_label
+        string change_type
+        text change_notes
+        timestamp date_created
+        timestamp date_updated
+    }
