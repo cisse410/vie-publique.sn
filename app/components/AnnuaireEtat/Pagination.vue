@@ -7,8 +7,8 @@
       :class="[
         'rounded-lg border px-3 py-2',
         currentPage === 1
-          ? 'cursor-not-allowed border-gray-200 text-gray-400'
-          : 'border-gray-300 text-gray-700 hover:bg-gray-50',
+          ? 'cursor-not-allowed border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-600'
+          : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800',
       ]"
     >
       ← Précédent
@@ -23,8 +23,8 @@
         :class="[
           'h-10 w-10 rounded-lg border font-medium',
           page === currentPage
-            ? 'border-blue-500 bg-blue-500 text-white'
-            : 'border-gray-300 text-gray-700 hover:bg-gray-50',
+            ? 'border-blue-500 dark:border-blue-400 bg-blue-500 dark:bg-blue-600 text-white'
+            : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800',
         ]"
       >
         {{ page }}
@@ -38,8 +38,8 @@
       :class="[
         'rounded-lg border px-3 py-2',
         currentPage === totalPages
-          ? 'cursor-not-allowed border-gray-200 text-gray-400'
-          : 'border-gray-300 text-gray-700 hover:bg-gray-50',
+          ? 'cursor-not-allowed border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-600'
+          : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800',
       ]"
     >
       Suivant →

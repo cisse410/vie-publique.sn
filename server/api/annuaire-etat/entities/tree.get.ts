@@ -2,9 +2,9 @@ import { readItems } from '@directus/sdk'
 
 /**
  * GET /api/annuaire-etat/entities/tree
- * Récupère l'arborescence complète pour un décret
+ * Récupère l'arborescence complète pour un décret avec cache de 15 minutes
  */
-export default defineEventHandler(async (event) => {
+export default defineCachedEventHandler(async (event) => {
   const query = getQuery(event)
   const decreeId = query.decree_id
 
@@ -28,14 +28,11 @@ export default defineEventHandler(async (event) => {
           'public_entity_id.entity_type_id.*',
           'parent_snapshot_id.*',
           'parent_snapshot_id.public_entity_id.*',
-          'parent_snapshot_id.public_entity_id.entity_type_id.*'  // ← AJOUT CRUCIAL !
+          'parent_snapshot_id.public_entity_id.entity_type_id.*'
         ],
         limit: -1  // Récupérer tous les items
       })
     )
-
-    // Construire l'arbre (la logique de construction sera côté client via utils)
-    // Ici on retourne juste les snapshots
 
     return {
       success: true,
@@ -47,5 +44,11 @@ export default defineEventHandler(async (event) => {
       statusCode: 500,
       message: 'Failed to fetch entity tree'
     })
+  }
+}, {
+  maxAge: 60 * 15, // Cache 15 minutes
+  getKey: (event) => {
+    const query = getQuery(event)
+    return `entities:tree:${query.decree_id}`
   }
 })

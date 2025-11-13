@@ -1,6 +1,6 @@
 <template>
   <div
-    class="list-item cursor-pointer rounded-lg border border-gray-200 bg-white p-4 transition-shadow hover:shadow-md"
+    class="list-item cursor-pointer rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 transition-shadow hover:shadow-md"
     @click="$emit('click')"
   >
     <div class="flex items-start gap-3">
@@ -12,15 +12,15 @@
       <!-- Content -->
       <div class="min-w-0 flex-1">
         <!-- Title -->
-        <h3 class="mb-1 text-lg font-semibold text-gray-900" v-html="highlightedLabel"></h3>
+        <h3 class="mb-1 text-lg font-semibold text-gray-900 dark:text-white" v-html="highlightedLabel"></h3>
 
         <!-- Canonical name (if different) -->
-        <p v-if="showCanonicalName" class="mb-2 text-sm text-gray-600">
+        <p v-if="showCanonicalName" class="mb-2 text-sm text-gray-600 dark:text-gray-400">
           {{ node.entity.canonical_name }}
         </p>
 
         <!-- Parent -->
-        <div v-if="parentLabel" class="mb-2 text-sm text-gray-500">📍 {{ parentLabel }}</div>
+        <div v-if="parentLabel" class="mb-2 text-sm text-gray-500 dark:text-gray-400">📍 {{ parentLabel }}</div>
 
         <!-- Badges -->
         <div class="mt-2 flex flex-wrap gap-2">
@@ -74,13 +74,40 @@ const showCanonicalName = computed(() => {
   return props.node.entity.canonical_name !== props.node.snapshot.official_label
 })
 
-const parentLabel = computed(() => {
-  if (!props.node.snapshot.parent_snapshot_id) return null
-
-  if (typeof props.node.snapshot.parent_snapshot_id === 'object') {
-    return props.node.snapshot.parent_snapshot_id.official_label
+// Find the parent ministry by traversing up the tree
+const findParentMinistry = (node: TreeNode): string | null => {
+  // If this node has no parent, return null
+  if (!node.snapshot.parent_snapshot_id || typeof node.snapshot.parent_snapshot_id !== 'object') {
+    return null
   }
 
-  return null
+  const parent = node.snapshot.parent_snapshot_id
+
+  // Check if parent is a ministry, presidence, or primature
+  if (parent.public_entity_id?.entity_type_id) {
+    const parentTypeCode = parent.public_entity_id.entity_type_id.code
+    if (['ministere', 'presidence', 'primature'].includes(parentTypeCode)) {
+      return parent.official_label || parent.public_entity_id.canonical_name
+    }
+  }
+
+  // If parent is not a ministry/presidence/primature, keep looking up
+  // We need to check if parent_snapshot_id has its own parent
+  if (parent.parent_snapshot_id && typeof parent.parent_snapshot_id === 'object') {
+    // Recursively search up the tree
+    const tempNode: TreeNode = {
+      ...node,
+      snapshot: parent
+    } as TreeNode
+    return findParentMinistry(tempNode)
+  }
+
+  // No ministry found, return the immediate parent as fallback
+  return parent.official_label
+}
+
+const parentLabel = computed(() => {
+  const ministry = findParentMinistry(props.node)
+  return ministry
 })
 </script>

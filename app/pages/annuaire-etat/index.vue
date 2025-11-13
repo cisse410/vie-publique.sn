@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import ListView from '~/components/AnnuaireEtat/ListView.vue'
-import StickyBar from '~/components/AnnuaireEtat/StickyBar.vue'
 import TreeView from '~/components/AnnuaireEtat/TreeView.vue'
 import { useDecrees } from '~/composables/annuaire-etat/useDecrees'
 import { useEntityChanges } from '~/composables/annuaire-etat/useEntityChanges'
@@ -8,9 +7,11 @@ import { useFilters } from '~/composables/annuaire-etat/useFilters'
 import { useTree } from '~/composables/annuaire-etat/useTree'
 import type { TreeNode } from '~~/types/etat'
 import { searchInTree } from '~~/utils/search'
-import { filterTree } from '~~/utils/tree-builder'
+import { filterTree, flattenTree, groupMinistries } from '~~/utils/tree-builder'
 
 const { keywords } = useSiteMetadata()
+const route = useRoute()
+const router = useRouter()
 
 const title = "Organisation de l'Etat du Sénégal"
 const description =
@@ -40,6 +41,7 @@ useSeoMeta({
   ].join(', '),
 })
 
+// Composables
 const {
   decrees,
   selectedDecree,
@@ -53,41 +55,75 @@ const { treeData, loading: treeLoading } = useTree()
 const { changes, getChangeStats } = useEntityChanges()
 
 const {
-  searchQuery,
-  selectedTypes,
+  searchQuery: filterSearchQuery,
+  selectedTypes: filterSelectedTypes,
   entityTypes,
   fetchEntityTypes,
   toggleType,
-  setSearchQuery,
-  resetFilters,
+  setSearchQuery: setFilterSearchQuery,
+  resetFilters: resetFilterState,
 } = useFilters()
 
-// View mode
-const viewMode = ref<'tree' | 'list'>('tree')
+// Query params pour SEO
+const viewMode = computed({
+  get: () => (route.query.view as 'tree' | 'list') || 'tree',
+  set: (value) => router.push({ query: { ...route.query, view: value, page: undefined } }),
+})
 
-// Load data on mount
+const searchQuery = computed({
+  get: () => (route.query.search as string) || '',
+  set: (value) => {
+    // Sync avec le composable de filtres
+    setFilterSearchQuery(value)
+    router.push({ query: { ...route.query, search: value || undefined, page: undefined } })
+  },
+})
+
+const selectedTypes = computed({
+  get: () => {
+    const types = route.query.types
+    if (!types) return []
+    return Array.isArray(types) ? types : [types]
+  },
+  set: (value) => router.push({ query: { ...route.query, types: value.length > 0 ? value : undefined, page: undefined } }),
+})
+
+// Sync query params avec composable filters au montage
+watch(
+  () => [route.query.search, route.query.types],
+  () => {
+    if (route.query.search) {
+      setFilterSearchQuery(route.query.search as string)
+    }
+  },
+  { immediate: true }
+)
+
+// Chargement des données
 onMounted(async () => {
   await Promise.all([fetchDecrees(), fetchEntityTypes()])
 })
 
+// Tree data avec groupement des ministères
+const groupedTreeData = computed(() => {
+  if (!treeData.value || treeData.value.length === 0) return []
+  return groupMinistries(treeData.value)
+})
+
 // Filtered tree data
 const filteredTreeData = computed(() => {
-  console.log('[index.vue] Computing filteredTreeData, treeData:', treeData.value.length)
-  let result = treeData.value
+  let result = groupedTreeData.value
 
   // Filter by search
   if (searchQuery.value) {
     result = searchInTree(result, searchQuery.value)
-    console.log('[index.vue] After search filter:', result.length)
   }
 
   // Filter by types
   if (selectedTypes.value.length > 0) {
     result = filterTree(result, (node) => selectedTypes.value.includes(node.type.code))
-    console.log('[index.vue] After type filter:', result.length)
   }
 
-  console.log('[index.vue] Final filteredTreeData:', result.length, result[0])
   return result
 })
 
@@ -96,52 +132,105 @@ const changeStats = computed(() => {
   return getChangeStats()
 })
 
+// Statistics by entity type
+const stats = computed(() => {
+  if (!treeData.value || treeData.value.length === 0) {
+    return {
+      ministeres: 0,
+      directions: 0,
+      services: 0,
+      total: 0,
+    }
+  }
+
+  const allEntities = flattenTree(treeData.value)
+
+  const ministeres = allEntities.filter((node) => node.type.code === 'ministere').length
+  const directions = allEntities.filter(
+    (node) => node.type.code === 'direction' || node.type.code === 'direction_generale',
+  ).length
+  const services = allEntities.filter((node) => node.type.code === 'service').length
+
+  return {
+    ministeres,
+    directions,
+    services,
+    total: allEntities.length,
+  }
+})
+
+// Filtered result count (flatten tree to count all entities, not just root nodes)
+const filteredResultCount = computed(() => {
+  return flattenTree(filteredTreeData.value).length
+})
+
+// Functions
+const setSearchQuery = (value: string) => {
+  searchQuery.value = value
+}
+
+const handleToggleType = (typeCode: string) => {
+  const current = selectedTypes.value
+  if (current.includes(typeCode)) {
+    selectedTypes.value = current.filter((t) => t !== typeCode)
+  } else {
+    selectedTypes.value = [...current, typeCode]
+  }
+  toggleType(typeCode)
+}
+
+const resetFilters = () => {
+  resetFilterState()
+  router.push({ query: { view: viewMode.value } })
+}
+
 // Navigate to entity
 const navigateToEntity = (node: TreeNode) => {
-  navigateTo(`/entites/${node.entity.slug}`)
+  if (node.entity.has_public_page) {
+    navigateTo(`/annuaire-etat/entites/${node.entity.slug}`)
+  }
 }
 </script>
 
 <template>
   <div class="flex flex-col px-4 py-6">
+    <!-- En-tête -->
     <div class="prose prose-sm mx-auto my-2 sm:prose">
       <h1 class="text-center dark:text-white">Organisation de l'État du Sénégal</h1>
       <p class="text-center text-gray-600 dark:text-gray-400">
-        Répartition des services de l'État selon le décret {{ selectedDecree?.numero }}
+        Répartition des services de l'État selon le décret n° {{ selectedDecree?.numero }}
       </p>
     </div>
 
     <div class="mx-auto mt-8 w-full max-w-6xl space-y-6">
-
+      <!-- Bannière Décret Actif -->
       <UCard class="ring-2 ring-blue-500 dark:ring-blue-500">
         <div class="space-y-3 md:space-y-4">
           <div class="flex flex-col items-start justify-between gap-3 md:flex-row md:gap-4">
             <div class="min-w-0 flex-1">
-              <div class="mb-2 flex flex-wrap items-center gap-2">
-                <UIcon
-                  name="i-heroicons-document-text"
-                  class="text-blue-600 dark:text-blue-400 h-5 w-5"
-                />
+              <div v-if="decreesLoading" class="h-6 w-48 animate-pulse bg-gray-200 dark:bg-gray-700 rounded"></div>
+              <div v-else class="mb-2 flex flex-wrap items-center gap-2">
                 <h3 class="text-base font-bold text-gray-900 md:text-lg dark:text-white">
-                  Décret {{ selectedDecree?.numero }}
+                  Décret n° {{ selectedDecree?.numero }}
                 </h3>
-                <UBadge color="green" variant="subtle" size="xs"> En vigueur </UBadge>
+                <UBadge color="green" variant="subtle" size="xs">
+                  En vigueur
+                </UBadge>
               </div>
-              <p class="mb-2 text-xs text-gray-600 md:text-sm dark:text-gray-400">
-                Répartition des services de l'État et du contrôle des Établissements publics
-              </p>
+              <div v-if="decreesLoading" class="h-4 w-64 animate-pulse bg-gray-200 dark:bg-gray-700 rounded mt-2"></div>
               <div
+                v-else
                 class="flex flex-wrap items-center gap-2 text-xs text-gray-500 md:gap-3 dark:text-gray-500"
               >
                 <span class="flex items-center gap-1">
                   <UIcon name="i-heroicons-calendar" class="h-3 w-3" />
                   {{ selectedDecree?.date_publication }}
                 </span>
-                <span class="flex items-center gap-1 truncate">
+                <span v-if="selectedDecree?.pr" class="flex items-center gap-1 truncate">
                   <UIcon name="i-heroicons-user" class="h-3 w-3 flex-shrink-0" />
                   <span class="hidden sm:inline">Président:</span> {{ selectedDecree?.pr }}
                 </span>
-                <span class="flex items-center gap-1 truncate">
+                <span v-if="selectedDecree?.pm" class="flex items-center gap-1 truncate">
                   <UIcon name="i-heroicons-user-group" class="h-3 w-3 flex-shrink-0" />
                   PM: {{ selectedDecree?.pm }}
                 </span>
@@ -151,11 +240,24 @@ const navigateToEntity = (node: TreeNode) => {
             <div class="flex w-full items-center gap-2 md:w-auto">
               <UButton
                 variant="outline"
+                color="primary"
+                size="xs"
+                icon="i-heroicons-clock"
+                class="flex-1 md:flex-initial"
+                to="/annuaire-etat/historique"
+              >
+                <span class="hidden sm:inline">Voir historique</span>
+                <span class="sm:hidden">Historique</span>
+              </UButton>
+              <UButton
+                v-if="selectedDecree?.document_url"
+                variant="outline"
                 color="gray"
                 size="xs"
                 icon="i-heroicons-document-text"
                 class="flex-1 md:flex-initial"
-                :to="selectedDecree?.document_url"
+                :to="selectedDecree.document_url"
+                target="_blank"
               >
                 <span class="hidden sm:inline">Voir le décret</span>
                 <span class="sm:hidden">Voir</span>
@@ -164,27 +266,121 @@ const navigateToEntity = (node: TreeNode) => {
           </div>
         </div>
       </UCard>
-    </div>
-  </div>
 
-  <div class="page-index min-h-screen bg-gray-50">
-    <StickyBar
-      :current-view="viewMode"
-      :decrees="decrees"
-      :selected-decree="selectedDecree"
-      :entity-types="entityTypes"
-      :selected-types="selectedTypes"
-      :search-query="searchQuery"
-      :change-stats="changeStats"
-      @view-change="viewMode = $event"
-      @decree-change="selectDecree"
-      @search="setSearchQuery"
-      @type-toggle="toggleType"
-      @reset-filters="resetFilters"
-    />
+      <!-- Statistiques -->
+      <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <UCard class="transition-all duration-200 hover:shadow-lg hover:scale-105 cursor-default">
+          <div class="text-center">
+            <div v-if="treeLoading" class="flex justify-center">
+              <div class="h-8 w-16 animate-pulse bg-purple-200 dark:bg-purple-800 rounded"></div>
+            </div>
+            <div v-else class="text-2xl font-bold text-purple-600 md:text-3xl dark:text-purple-400">
+              {{ stats.ministeres }}
+            </div>
+            <div class="mt-1 text-xs text-gray-600 md:text-sm dark:text-gray-400">Ministères</div>
+          </div>
+        </UCard>
+        <UCard class="transition-all duration-200 hover:shadow-lg hover:scale-105 cursor-default">
+          <div class="text-center">
+            <div v-if="treeLoading" class="flex justify-center">
+              <div class="h-8 w-16 animate-pulse bg-green-200 dark:bg-green-800 rounded"></div>
+            </div>
+            <div v-else class="text-2xl font-bold text-green-600 md:text-3xl dark:text-green-400">
+              {{ stats.directions }}
+            </div>
+            <div class="mt-1 text-xs text-gray-600 md:text-sm dark:text-gray-400">Directions</div>
+          </div>
+        </UCard>
+        <UCard class="transition-all duration-200 hover:shadow-lg hover:scale-105 cursor-default">
+          <div class="text-center">
+            <div v-if="treeLoading" class="flex justify-center">
+              <div class="h-8 w-16 animate-pulse bg-orange-200 dark:bg-orange-800 rounded"></div>
+            </div>
+            <div v-else class="text-2xl font-bold text-orange-600 md:text-3xl dark:text-orange-400">
+              {{ stats.services }}
+            </div>
+            <div class="mt-1 text-xs text-gray-600 md:text-sm dark:text-gray-400">Services</div>
+          </div>
+        </UCard>
+        <UCard class="transition-all duration-200 hover:shadow-lg hover:scale-105 cursor-default">
+          <div class="text-center">
+            <div v-if="treeLoading" class="flex justify-center">
+              <div class="h-8 w-16 animate-pulse bg-blue-200 dark:bg-blue-800 rounded"></div>
+            </div>
+            <div v-else class="text-2xl font-bold text-blue-600 md:text-3xl dark:text-blue-400">
+              {{ stats.total }}
+            </div>
+            <div class="mt-1 text-xs text-gray-600 md:text-sm dark:text-gray-400">Total</div>
+          </div>
+        </UCard>
+      </div>
 
-    <!-- Main content -->
-    <div class="container mx-auto">
+      <!-- Sélecteur de vue et recherche -->
+      <div class="flex flex-col items-stretch gap-3 md:flex-row md:items-center">
+        <div class="flex items-center gap-2">
+          <UButton
+            :variant="viewMode === 'tree' ? 'solid' : 'soft'"
+            color="primary"
+            icon="i-heroicons-squares-2x2"
+            size="sm"
+            @click="viewMode = 'tree'"
+          >
+            Arborescence
+          </UButton>
+          <UButton
+            :variant="viewMode === 'list' ? 'solid' : 'soft'"
+            color="primary"
+            icon="i-heroicons-list-bullet"
+            size="sm"
+            @click="viewMode = 'list'"
+          >
+            Liste
+          </UButton>
+        </div>
+
+        <!-- Recherche -->
+        <UInput
+          :model-value="searchQuery"
+          @update:model-value="setSearchQuery"
+          icon="i-heroicons-magnifying-glass"
+          placeholder="Rechercher une entité..."
+          class="flex-1"
+          size="md"
+        />
+
+        <!-- Filtre par type (pour la vue liste) -->
+        <div v-if="viewMode === 'list' && entityTypes.length > 0" class="flex flex-wrap gap-2">
+          <UButton
+            v-for="type in entityTypes.slice(0, 5)"
+            :key="type.code"
+            :variant="selectedTypes.includes(type.code) ? 'solid' : 'soft'"
+            color="gray"
+            size="xs"
+            @click="handleToggleType(type.code)"
+          >
+            {{ type.label }}
+          </UButton>
+        </div>
+      </div>
+
+      <!-- Résultat de recherche -->
+      <div
+        v-if="searchQuery || selectedTypes.length > 0"
+        class="text-sm text-gray-600 dark:text-gray-400"
+      >
+        {{ filteredResultCount }} résultat(s)
+        <UButton
+          v-if="searchQuery || selectedTypes.length > 0"
+          variant="ghost"
+          color="gray"
+          size="xs"
+          @click="resetFilters"
+          class="ml-2"
+        >
+          Réinitialiser
+        </UButton>
+      </div>
+
       <!-- Tree view -->
       <TreeView
         v-if="viewMode === 'tree'"

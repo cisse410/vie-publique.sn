@@ -6,7 +6,7 @@
     </div>
 
     <!-- Empty state -->
-    <div v-else-if="!treeData || treeData.length === 0" class="py-12 text-center text-gray-500">
+    <div v-else-if="!treeData || treeData.length === 0" class="py-12 text-center text-gray-500 dark:text-gray-400">
       <p class="text-lg">Aucune entité trouvée</p>
       <p class="mt-2 text-sm">Essayez de modifier vos filtres de recherche</p>
     </div>
@@ -48,13 +48,4 @@ const emit = defineEmits<{
 const handleNodeClick = (node: TreeNode) => {
   emit('node-click', node)
 }
-
-// Log pour debug
-watchEffect(() => {
-  console.log('[TreeView] Props:', {
-    loading: props.loading,
-    treeDataLength: props.treeData?.length,
-    hasData: props.treeData && props.treeData.length > 0
-  })
-})
 </script>

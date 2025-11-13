@@ -7,7 +7,6 @@ export function buildTree(
   snapshots: EntitySnapshotWithRelations[],
   options: TreeBuildOptions = {}
 ): TreeNode[] {
-  console.log('[buildTree] Input snapshots:', snapshots.length)
   const { maxDepth, includeRemoved = true, sortBy = 'order' } = options
 
   // Créer une map pour accès rapide par ID de snapshot
@@ -28,12 +27,6 @@ export function buildTree(
       : null
 
     if (!entity || !entityType) {
-      console.warn('Snapshot incomplet, ignoré:', snapshot.id, {
-        hasEntity: !!entity,
-        hasEntityType: !!entityType,
-        entity,
-        entityType
-      })
       return
     }
 
@@ -84,12 +77,6 @@ export function buildTree(
     }
   })
 
-  console.log('[buildTree] Hierarchy stats:', {
-    noParentCount,
-    parentNotFoundCount,
-    rootsFound: roots.length
-  })
-
   // Trier les nœuds selon les options
   const sortNodes = (nodes: TreeNode[]): TreeNode[] => {
     const sorted = [...nodes]
@@ -119,11 +106,6 @@ export function buildTree(
   }
 
   const result = sortNodes(roots)
-  console.log('[buildTree] Output:', {
-    totalSnapshots: snapshots.length,
-    processedNodes: snapshotMap.size,
-    rootNodes: result.length
-  })
   return result
 }
 
@@ -225,4 +207,111 @@ export function filterTree(
   })
 
   return filtered
+}
+
+/**
+ * Regroupe les ministères sous un parent virtuel "Ministères"
+ * Pour une meilleure visualisation avec 3 parents : Présidence, Primature, Ministères
+ */
+export function groupMinistries(nodes: TreeNode[]): TreeNode[] {
+  const presidence: TreeNode[] = []
+  const primature: TreeNode[] = []
+  const ministries: TreeNode[] = []
+  const others: TreeNode[] = []
+
+  nodes.forEach(node => {
+    if (node.type.code === 'presidence') {
+      presidence.push(node)
+    } else if (node.type.code === 'primature') {
+      primature.push(node)
+    } else if (node.type.code === 'ministere') {
+      ministries.push(node)
+    } else {
+      others.push(node)
+    }
+  })
+  const result: TreeNode[] = []
+
+  // Ajouter Présidence
+  if (presidence.length > 0) {
+    result.push(...presidence)
+  }
+
+  // Ajouter Primature
+  if (primature.length > 0) {
+    result.push(...primature)
+  }
+
+  // Créer un nœud virtuel "Ministères" si des ministères existent
+  if (ministries.length > 0) {
+    const ministriesParentNode: TreeNode = {
+      snapshot: {
+        id: 'virtual-ministeres',
+        official_label: 'Ministères',
+        public_entity_id: {
+          id: 'virtual-ministeres',
+          slug: 'ministeres',
+          canonical_name: 'Ministères',
+          entity_type_id: {
+            id: 'virtual-ministeres-type',
+            code: 'ministeres',
+            label: 'Ministères',
+            can_have_children: true,
+            date_created: '',
+            date_updated: '',
+          },
+          has_public_page: false,
+          first_appearance: '',
+          date_created: '',
+          date_updated: '',
+        },
+        decree_id: ministries[0].snapshot.decree_id,
+        parent_snapshot_id: null,
+        date_created: '',
+        date_updated: '',
+      } as any,
+      entity: {
+        id: 'virtual-ministeres',
+        slug: 'ministeres',
+        canonical_name: 'Ministères',
+        entity_type_id: {
+          id: 'virtual-ministeres-type',
+          code: 'ministeres',
+          label: 'Ministères',
+          can_have_children: true,
+          date_created: '',
+          date_updated: '',
+        },
+        has_public_page: false,
+        first_appearance: '',
+        date_created: '',
+        date_updated: '',
+      },
+      type: {
+        id: 'virtual-ministeres-type',
+        code: 'ministeres',
+        label: 'Ministères',
+        can_have_children: true,
+        date_created: '',
+        date_updated: '',
+      },
+      children: ministries,
+      level: 0,
+      path: ['ministeres'],
+    }
+
+    // Ajuster le niveau des ministères
+    ministries.forEach(ministry => {
+      ministry.level = 1
+      ministry.path = ['ministeres', ministry.entity.slug]
+    })
+
+    result.push(ministriesParentNode)
+  }
+
+  // NE PAS ajouter les entités orphelines dans l'arborescence
+  // Elles ne devraient pas exister dans une hiérarchie correcte
+  // et leur présence indique un problème dans les données
+
+  return result
 }

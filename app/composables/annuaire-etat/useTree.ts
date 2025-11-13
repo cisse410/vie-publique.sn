@@ -17,21 +17,13 @@ export const useTree = () => {
    * Charger l'arborescence pour un décret donné
    */
   const fetchTree = async (decreeId: string) => {
-    console.log('[useTree] Fetching tree for decree:', decreeId)
     loading.value = true
     error.value = null
 
     try {
       const response = await $fetch<{ success: boolean, data: EntitySnapshotWithRelations[] }>(`/api/annuaire-etat/entities/tree?decree_id=${decreeId}`)
-      console.log('[useTree] API response:', {
-        success: response.success,
-        dataCount: response.data.length,
-        firstItem: response.data[0]
-      })
       treeData.value = buildTree(response.data)
-      console.log('[useTree] Tree built, nodes:', treeData.value.length)
     } catch (err) {
-      console.error('[useTree] Error fetching tree:', err)
       error.value = err as Error
       treeData.value = []
     } finally {

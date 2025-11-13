@@ -101,16 +101,7 @@ const totalPages = computed(() => Math.ceil(filteredEntities.value.length / perP
 const paginatedEntities = computed(() => {
   const start = (currentPage.value - 1) * perPage
   const end = start + perPage
-  const result = filteredEntities.value.slice(start, end)
-  console.log('[ListView] Paginated entities:', {
-    total: filteredEntities.value.length,
-    currentPage: currentPage.value,
-    start,
-    end,
-    resultCount: result.length,
-    firstItem: result[0]
-  })
-  return result
+  return filteredEntities.value.slice(start, end)
 })
 
 // Reset page when filters change

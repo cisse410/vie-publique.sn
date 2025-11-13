@@ -1,5 +1,5 @@
 <template>
-  <div class="sticky top-0 z-50 border-b bg-white shadow-sm">
+  <div class="sticky top-0 z-50 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm">
     <div class="container mx-auto px-4 py-3">
       <!-- Première ligne : Décret + Recherche + Toggle Vue -->
       <div class="flex flex-col items-stretch gap-3 md:flex-row md:items-center">
@@ -24,8 +24,8 @@
             :class="[
               'rounded-lg px-4 py-2 font-medium transition-colors',
               currentView === 'tree'
-                ? 'bg-blue-500 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
+                ? 'bg-blue-500 dark:bg-blue-600 text-white'
+                : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700',
             ]"
             title="Vue arborescence"
           >
@@ -37,8 +37,8 @@
             :class="[
               'rounded-lg px-4 py-2 font-medium transition-colors',
               currentView === 'list'
-                ? 'bg-blue-500 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
+                ? 'bg-blue-500 dark:bg-blue-600 text-white'
+                : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700',
             ]"
             title="Vue liste"
           >
@@ -63,7 +63,7 @@
         <button
           v-if="hasActiveFilters"
           @click="$emit('reset-filters')"
-          class="px-3 py-1 text-sm text-gray-600 underline hover:text-gray-900"
+          class="px-3 py-1 text-sm text-gray-600 dark:text-gray-400 underline hover:text-gray-900 dark:hover:text-gray-200"
         >
           Réinitialiser
         </button>
@@ -71,14 +71,14 @@
 
       <!-- Statistiques de changements (si disponibles) -->
       <div v-if="changeStats && changeStats.total > 0" class="mt-3 flex gap-4 text-sm">
-        <span class="text-gray-600">
-          <span class="font-semibold text-green-600">{{ changeStats.new }}</span> nouveau(x)
+        <span class="text-gray-600 dark:text-gray-400">
+          <span class="font-semibold text-green-600 dark:text-green-400">{{ changeStats.new }}</span> nouveau(x)
         </span>
-        <span class="text-gray-600">
-          <span class="font-semibold text-orange-600">{{ changeStats.modified }}</span> modifié(s)
+        <span class="text-gray-600 dark:text-gray-400">
+          <span class="font-semibold text-orange-600 dark:text-orange-400">{{ changeStats.modified }}</span> modifié(s)
         </span>
-        <span class="text-gray-600">
-          <span class="font-semibold text-red-600">{{ changeStats.removed }}</span> supprimé(s)
+        <span class="text-gray-600 dark:text-gray-400">
+          <span class="font-semibold text-red-600 dark:text-red-400">{{ changeStats.removed }}</span> supprimé(s)
         </span>
       </div>
     </div>

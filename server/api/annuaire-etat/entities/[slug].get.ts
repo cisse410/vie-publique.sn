@@ -19,7 +19,10 @@ export default defineCachedEventHandler(async (event) => {
   try {
     const entities = await client.request(
       readItems('public_entities', {
-        filter: { slug: { _eq: slug } },
+        filter: {
+          slug: { _eq: slug },
+          has_public_page: { _eq: true } // Only entities with public page
+        },
         limit: 1,
         fields: [
           '*',
@@ -34,11 +37,69 @@ export default defineCachedEventHandler(async (event) => {
     if (!entities || entities.length === 0) {
       throw createError({
         statusCode: 404,
-        message: `Entity ${slug} not found`
+        message: `Entity ${slug} not found or does not have a public page`
       })
     }
 
-    return entities[0]
+    const entity = entities[0]
+
+    // Fetch child entities (structures rattachées) from the active decree
+    const activeDecree = await client.request(
+      readItems('decree', {
+        filter: { status: { _eq: 'active' } },
+        limit: 1,
+        fields: ['id']
+      })
+    )
+
+    let childEntities = []
+    if (activeDecree && activeDecree.length > 0) {
+      const decreeId = activeDecree[0].id
+
+      // First, find the current snapshot of this entity
+      // Note: public_entity_id est l'ID direct, pas un objet avec .id
+      const currentSnapshot = await client.request(
+        readItems('entity_snapshots', {
+          filter: {
+            decree_id: { _eq: decreeId },
+            public_entity_id: { _eq: entity.id }
+          },
+          limit: 1,
+          fields: ['id']
+        })
+      )
+
+      if (currentSnapshot && currentSnapshot.length > 0) {
+        const snapshotId = currentSnapshot[0].id
+
+        // Find snapshots where this snapshot is the parent
+        // Note: parent_snapshot_id est l'ID direct, pas un objet avec .id
+        const childSnapshots = await client.request(
+          readItems('entity_snapshots', {
+            filter: {
+              decree_id: { _eq: decreeId },
+              parent_snapshot_id: { _eq: snapshotId }
+            },
+            fields: [
+              '*',
+              'public_entity_id.*',
+              'public_entity_id.entity_type_id.*'
+            ],
+            sort: ['public_entity_id.canonical_name']
+          })
+        )
+
+        childEntities = childSnapshots.map((snapshot: any) => ({
+          ...snapshot.public_entity_id,
+          official_label: snapshot.official_label
+        }))
+      }
+    }
+
+    return {
+      ...entity,
+      child_entities: childEntities
+    }
   } catch (error: any) {
     if (error.statusCode) throw error
 
