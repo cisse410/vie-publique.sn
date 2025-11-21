@@ -1,11 +1,5 @@
 <template>
   <div class="list-view p-4">
-    <!-- Stats bar -->
-    <div v-if="filteredEntities.length > 0" class="mb-4 text-sm text-gray-600">
-      <span class="font-medium">{{ filteredEntities.length }}</span>
-      {{ pluralize(filteredEntities.length, 'entité', 'entités') }}
-      <span v-if="searchQuery"> correspondant à "{{ searchQuery }}"</span>
-    </div>
 
     <!-- Loading state -->
     <div v-if="loading" class="space-y-3">
@@ -31,8 +25,22 @@
     </div>
 
     <!-- Pagination -->
-    <div v-if="totalPages > 1" class="mt-6 flex justify-center">
-      <Pagination v-model="currentPage" :total-pages="totalPages" />
+    <div v-if="totalPages > 1" class="mt-8 flex justify-center">
+      <UPagination
+        v-model="currentPage"
+        :total="filteredEntities.length"
+        :default-page="1"
+        :show-edges="true"
+        :sibling-count="2"
+        :active-button="{ color: 'yellow' }"
+        :ui="{
+          wrapper: 'flex items-center gap-1',
+          base: 'min-w-8 min-h-8 flex items-center justify-center rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none disabled:cursor-not-allowed',
+          active: 'bg-gray-900 text-white dark:bg-gray-700',
+          inactive:
+            'bg-white text-gray-900 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700',
+        }"
+      />
     </div>
   </div>
 </template>
@@ -49,6 +57,7 @@ interface Props {
   changes?: Map<string, SnapshotComparison>
   searchQuery?: string
   selectedTypes?: string[]
+  currentPage?: number
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -56,17 +65,28 @@ const props = withDefaults(defineProps<Props>(), {
   changes: () => new Map(),
   searchQuery: '',
   selectedTypes: () => [],
+  currentPage: 1,
 })
 
 const emit = defineEmits<{
   'entity-click': [node: TreeNode]
+  'update:currentPage': [page: number]
 }>()
 
-const currentPage = ref(1)
+const currentPage = computed({
+  get: () => props.currentPage,
+  set: (value) => emit('update:currentPage', value),
+})
 const perPage = 20
 
-// Flatten tree
-const allEntities = computed(() => flattenTree(props.treeData))
+// Flatten tree et exclure les entités de regroupement et sections virtuelles
+const allEntities = computed(() => {
+  const flattened = flattenTree(props.treeData)
+  return flattened.filter(node =>
+    node.type.code !== 'entite_regroupement' &&
+    node.type.code !== 'section'
+  )
+})
 
 // Filter and search
 const filteredEntities = computed(() => {
@@ -108,7 +128,9 @@ const paginatedEntities = computed(() => {
 watch(
   () => [props.searchQuery, props.selectedTypes],
   () => {
-    currentPage.value = 1
+    if (props.currentPage !== 1) {
+      emit('update:currentPage', 1)
+    }
   },
 )
 </script>

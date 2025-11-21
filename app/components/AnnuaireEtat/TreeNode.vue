@@ -3,8 +3,11 @@
     <div
       :class="[
         'flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 transition-colors',
-        'hover:bg-gray-50 dark:hover:bg-gray-800',
-        isExpanded && 'bg-gray-50 dark:bg-gray-800',
+        isVirtualSection
+          ? 'bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/30'
+          : 'hover:bg-gray-50 dark:hover:bg-gray-800',
+        isExpanded && !isVirtualSection && 'bg-gray-50 dark:bg-gray-800',
+        isExpanded && isVirtualSection && 'bg-blue-100 dark:bg-blue-900/30',
       ]"
       :style="{ marginLeft: `${level * 24}px` }"
       @click="handleClick"
@@ -20,11 +23,19 @@
       <span v-else class="w-5 flex-shrink-0"></span>
 
       <!-- Label with search highlight -->
-      <span class="flex-1 font-medium text-gray-900 dark:text-white" v-html="highlightedLabel"></span>
+      <span
+        :class="[
+          'flex-1 font-medium',
+          isVirtualSection
+            ? 'text-blue-700 font-semibold dark:text-blue-300'
+            : 'text-gray-900 dark:text-white'
+        ]"
+        v-html="highlightedLabel"
+      ></span>
 
       <!-- Badges -->
       <div class="flex flex-shrink-0 items-center gap-2">
-        <TypeChip :type="node.type" size="sm" />
+        <!-- <TypeChip :type="node.type" size="sm" /> -->
 
         <Badge v-if="changeStatus === 'new'" color="green">Nouveau</Badge>
         <Badge v-else-if="changeStatus === 'modified'" color="orange">Modifié</Badge>
@@ -78,6 +89,10 @@ const isExpanded = ref(props.level < 2) // Auto-expand first 2 levels
 
 const hasChildren = computed(() => props.node.children.length > 0)
 
+const isVirtualSection = computed(() => {
+  return props.node.type.code === 'section' || props.node.entity.id.startsWith('virtual-')
+})
+
 const changeStatus = computed(() => {
   const change = props.changes?.get(props.node.entity.id)
   return change?.change
@@ -95,7 +110,8 @@ const toggle = () => {
 }
 
 const handleClick = () => {
-  if (hasChildren.value) {
+  // Les sections virtuelles ne peuvent qu'être expand/collapse
+  if (isVirtualSection.value || hasChildren.value) {
     toggle()
   } else {
     emit('node-click', props.node)

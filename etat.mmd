@@ -3,6 +3,7 @@ erDiagram
     public_entities ||--o{ entity_snapshots : "has snapshots"
     decree ||--o{ entity_snapshots : "contains"
     entity_snapshots ||--o{ entity_snapshots : "parent-child"
+    public_entities ||--o{ entity_changes : "concerne"
 
     entities_types {
         int id PK
@@ -52,4 +53,17 @@ erDiagram
         text change_notes
         timestamp date_created
         timestamp date_updated
+    }
+
+    entity_changes {
+        uuid id PK
+        uuid entity_id FK
+        uuid from_decret_id FK
+        uuid to_decret_id FK
+        enum change_category "rename|reparent|merge|split|created|deleted"
+        json old_value
+        json new_value
+        text description
+        string reference_url
+        timestamp created_at
     }

@@ -7,7 +7,7 @@ import { useFilters } from '~/composables/annuaire-etat/useFilters'
 import { useTree } from '~/composables/annuaire-etat/useTree'
 import type { TreeNode } from '~~/types/etat'
 import { searchInTree } from '~~/utils/search'
-import { filterTree, flattenTree, groupMinistries } from '~~/utils/tree-builder'
+import { filterTree, flattenTree, groupMinistries, applyGroupingToTree } from '~~/utils/tree-builder'
 
 const { keywords } = useSiteMetadata()
 const route = useRoute()
@@ -88,6 +88,17 @@ const selectedTypes = computed({
   set: (value) => router.push({ query: { ...route.query, types: value.length > 0 ? value : undefined, page: undefined } }),
 })
 
+const currentPage = computed({
+  get: () => {
+    const page = route.query.page
+    if (!page) return 1
+    return parseInt(page as string, 10) || 1
+  },
+  set: (value) => {
+    router.push({ query: { ...route.query, page: value > 1 ? value.toString() : undefined } })
+  },
+})
+
 // Sync query params avec composable filters au montage
 watch(
   () => [route.query.search, route.query.types],
@@ -104,10 +115,11 @@ onMounted(async () => {
   await Promise.all([fetchDecrees(), fetchEntityTypes()])
 })
 
-// Tree data avec groupement des ministères
+// Tree data avec groupement des ministères et sections
 const groupedTreeData = computed(() => {
   if (!treeData.value || treeData.value.length === 0) return []
-  return groupMinistries(treeData.value)
+  const withMinistries = groupMinistries(treeData.value)
+  return applyGroupingToTree(withMinistries)
 })
 
 // Filtered tree data
@@ -137,24 +149,38 @@ const stats = computed(() => {
   if (!treeData.value || treeData.value.length === 0) {
     return {
       ministeres: 0,
-      directions: 0,
-      services: 0,
+      etablissements_publics: 0,
+      societes_participation: 0,
+      societes_nationales: 0,
       total: 0,
     }
   }
 
   const allEntities = flattenTree(treeData.value)
 
-  const ministeres = allEntities.filter((node) => node.type.code === 'ministere').length
-  const directions = allEntities.filter(
-    (node) => node.type.code === 'direction' || node.type.code === 'direction_generale',
+  // Compter uniquement les ministères (pas présidence ni primature)
+  // On compte dans toutes les entités, pas seulement les racines
+  const ministeres = allEntities.filter(
+    (node) => node.type.code === 'ministere'
   ).length
-  const services = allEntities.filter((node) => node.type.code === 'service').length
+
+  const etablissements_publics = allEntities.filter(
+    (node) => node.type.code === 'etablissement_public'
+  ).length
+
+  const societes_participation = allEntities.filter(
+    (node) => node.type.code === 'societe_participation_publique'
+  ).length
+
+  const societes_nationales = allEntities.filter(
+    (node) => node.type.code === 'societe_nationale'
+  ).length
 
   return {
     ministeres,
-    directions,
-    services,
+    etablissements_publics,
+    societes_participation,
+    societes_nationales,
     total: allEntities.length,
   }
 })
@@ -162,6 +188,12 @@ const stats = computed(() => {
 // Filtered result count (flatten tree to count all entities, not just root nodes)
 const filteredResultCount = computed(() => {
   return flattenTree(filteredTreeData.value).length
+})
+
+// Types de filtres à afficher (seulement les 4 types principaux)
+const displayedFilterTypes = computed(() => {
+  const allowedCodes = ['ministere', 'etablissement_public', 'societe_participation_publique', 'societe_nationale']
+  return entityTypes.value.filter(type => allowedCodes.includes(type.code))
 })
 
 // Functions
@@ -286,9 +318,9 @@ const navigateToEntity = (node: TreeNode) => {
               <div class="h-8 w-16 animate-pulse bg-green-200 dark:bg-green-800 rounded"></div>
             </div>
             <div v-else class="text-2xl font-bold text-green-600 md:text-3xl dark:text-green-400">
-              {{ stats.directions }}
+              {{ stats.etablissements_publics }}
             </div>
-            <div class="mt-1 text-xs text-gray-600 md:text-sm dark:text-gray-400">Directions</div>
+            <div class="mt-1 text-xs text-gray-600 md:text-sm dark:text-gray-400">Établissements publics</div>
           </div>
         </UCard>
         <UCard class="transition-all duration-200 hover:shadow-lg hover:scale-105 cursor-default">
@@ -297,9 +329,9 @@ const navigateToEntity = (node: TreeNode) => {
               <div class="h-8 w-16 animate-pulse bg-orange-200 dark:bg-orange-800 rounded"></div>
             </div>
             <div v-else class="text-2xl font-bold text-orange-600 md:text-3xl dark:text-orange-400">
-              {{ stats.services }}
+              {{ stats.societes_participation }}
             </div>
-            <div class="mt-1 text-xs text-gray-600 md:text-sm dark:text-gray-400">Services</div>
+            <div class="mt-1 text-xs text-gray-600 md:text-sm dark:text-gray-400">Sociétès à participation publique</div>
           </div>
         </UCard>
         <UCard class="transition-all duration-200 hover:shadow-lg hover:scale-105 cursor-default">
@@ -308,9 +340,9 @@ const navigateToEntity = (node: TreeNode) => {
               <div class="h-8 w-16 animate-pulse bg-blue-200 dark:bg-blue-800 rounded"></div>
             </div>
             <div v-else class="text-2xl font-bold text-blue-600 md:text-3xl dark:text-blue-400">
-              {{ stats.total }}
+              {{ stats.societes_nationales }}
             </div>
-            <div class="mt-1 text-xs text-gray-600 md:text-sm dark:text-gray-400">Total</div>
+            <div class="mt-1 text-xs text-gray-600 md:text-sm dark:text-gray-400">Sociétés nationales</div>
           </div>
         </UCard>
       </div>
@@ -349,18 +381,22 @@ const navigateToEntity = (node: TreeNode) => {
         />
 
         <!-- Filtre par type (pour la vue liste) -->
-        <div v-if="viewMode === 'list' && entityTypes.length > 0" class="flex flex-wrap gap-2">
-          <UButton
-            v-for="type in entityTypes.slice(0, 5)"
-            :key="type.code"
-            :variant="selectedTypes.includes(type.code) ? 'solid' : 'soft'"
-            color="gray"
-            size="xs"
-            @click="handleToggleType(type.code)"
-          >
-            {{ type.label }}
-          </UButton>
-        </div>
+        <USelectMenu
+          v-if="viewMode === 'list' && entityTypes.length > 0"
+          v-model="selectedTypes"
+          :options="displayedFilterTypes"
+          multiple
+          placeholder="Filtrer par type"
+          value-attribute="code"
+          option-attribute="label"
+          class="w-full md:w-64"
+          size="md"
+        >
+          <template #label>
+            <span v-if="selectedTypes.length === 0">Filtrer par type</span>
+            <span v-else>{{ selectedTypes.length }} type(s)</span>
+          </template>
+        </USelectMenu>
       </div>
 
       <!-- Résultat de recherche -->
@@ -399,6 +435,7 @@ const navigateToEntity = (node: TreeNode) => {
         :changes="changes"
         :search-query="searchQuery"
         :selected-types="selectedTypes"
+        v-model:current-page="currentPage"
         @entity-click="navigateToEntity"
       />
     </div>

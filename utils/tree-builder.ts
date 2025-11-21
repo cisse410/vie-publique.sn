@@ -315,3 +315,159 @@ export function groupMinistries(nodes: TreeNode[]): TreeNode[] {
 
   return result
 }
+
+/**
+ * Groupe les enfants d'un nœud par sections administratives
+ * Selon les spécifications VP Specs Annuaire État
+ *
+ * Ne créer des sections virtuelles QUE pour les enfants directs (level + 1)
+ * Les entités de regroupement (###, ####) conservent leur hiérarchie
+ */
+export function groupChildrenBySections(node: TreeNode): TreeNode {
+  if (!node.children || node.children.length === 0) {
+    return node
+  }
+
+  // Séparer les enfants directs des entités de regroupement
+  const directChildren: TreeNode[] = []
+  const regroupementChildren: TreeNode[] = []
+
+  node.children.forEach(child => {
+    if (child.type.code === 'entite_regroupement') {
+      // Les entités de regroupement restent telles quelles avec leurs enfants
+      regroupementChildren.push(groupChildrenBySections(child))
+    } else {
+      directChildren.push(child)
+    }
+  })
+
+  // Types de sections à créer uniquement pour les enfants directs
+  const sections = [
+    { code: 'cabinet', label: 'Cabinet et services rattachés', codes: ['cabinet'] },
+    { code: 'secretariat', label: 'Secrétariat général et services rattachés', codes: ['secretariat'] },
+    { code: 'directions', label: 'Directions', codes: ['direction', 'direction_generale'] },
+    { code: 'autres_administrations', label: 'Autres administrations', codes: ['autres_administrations'] },
+    { code: 'etablissements_publics', label: 'Établissements publics', codes: ['etablissement_public'] },
+    { code: 'societes_nationales', label: 'Sociétés nationales', codes: ['societe_nationale'] },
+    { code: 'societes_participation', label: 'Sociétés à participation publique', codes: ['societe_participation_publique'] }
+  ]
+
+  const groupedChildren: TreeNode[] = []
+  const ungroupedChildren: TreeNode[] = []
+
+  sections.forEach(section => {
+    // Vérifier si une entité de regroupement existe déjà avec un label similaire
+    const normalizeLabel = (label: string) => label.toLowerCase().replace(/\s+/g, ' ').trim()
+    const hasRegroupement = regroupementChildren.some(child =>
+      normalizeLabel(child.snapshot.official_label).includes(normalizeLabel(section.label.split(' et ')[0]))
+    )
+
+    // Si une entité de regroupement existe déjà, ne pas créer de section virtuelle
+    if (hasRegroupement) {
+      return
+    }
+
+    const sectionChildren = directChildren.filter(child =>
+      section.codes.includes(child.type.code)
+    )
+
+    if (sectionChildren.length > 0) {
+      // Créer un nœud virtuel pour cette section
+      const sectionNode: TreeNode = {
+        snapshot: {
+          id: `virtual-${node.entity.slug}-${section.code}`,
+          official_label: section.label,
+          public_entity_id: {
+            id: `virtual-${node.entity.slug}-${section.code}`,
+            slug: `${node.entity.slug}-${section.code}`,
+            canonical_name: section.label,
+            entity_type_id: {
+              id: `virtual-section-type`,
+              code: 'section',
+              label: 'Section',
+              can_have_children: true,
+              date_created: '',
+              date_updated: '',
+            },
+            has_public_page: false,
+            first_appearance: '',
+            date_created: '',
+            date_updated: '',
+          },
+          decree_id: node.snapshot.decree_id,
+          parent_snapshot_id: node.snapshot.id,
+          date_created: '',
+          date_updated: '',
+        } as any,
+        entity: {
+          id: `virtual-${node.entity.slug}-${section.code}`,
+          slug: `${node.entity.slug}-${section.code}`,
+          canonical_name: section.label,
+          entity_type_id: {
+            id: `virtual-section-type`,
+            code: 'section',
+            label: 'Section',
+            can_have_children: true,
+            date_created: '',
+            date_updated: '',
+          },
+          has_public_page: false,
+          first_appearance: '',
+          date_created: '',
+          date_updated: '',
+        },
+        type: {
+          id: `virtual-section-type`,
+          code: 'section',
+          label: 'Section',
+          can_have_children: true,
+          date_created: '',
+          date_updated: '',
+        },
+        children: sectionChildren.map(child => ({
+          ...child,
+          level: node.level + 2,
+          path: [...(node.path || []), `${node.entity.slug}-${section.code}`, child.entity.slug]
+        })),
+        level: node.level + 1,
+        path: [...(node.path || []), `${node.entity.slug}-${section.code}`],
+      }
+
+      groupedChildren.push(sectionNode)
+    }
+  })
+
+  // Récupérer les enfants directs qui ne correspondent à aucune section
+  const allSectionCodes = sections.flatMap(s => s.codes)
+  ungroupedChildren.push(...directChildren.filter(child =>
+    !allSectionCodes.includes(child.type.code)
+  ))
+
+  return {
+    ...node,
+    children: [...groupedChildren, ...regroupementChildren, ...ungroupedChildren]
+  }
+}
+
+/**
+ * Applique le groupement par sections à tout l'arbre
+ * Seulement pour les ministères et entités de niveau 1
+ */
+export function applyGroupingToTree(nodes: TreeNode[]): TreeNode[] {
+  return nodes.map(node => {
+    // Appliquer le groupement seulement aux ministères (niveau racine des ministères)
+    if (['ministere', 'presidence', 'primature'].includes(node.type.code)) {
+      return groupChildrenBySections(node)
+    }
+
+    // Appliquer récursivement aux enfants
+    if (node.children.length > 0) {
+      return {
+        ...node,
+        children: node.children.map(child => groupChildrenBySections(child))
+      }
+    }
+
+    return node
+  })
+}

@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { useEntity } from '~/composables/annuaire-etat/useEntity'
-import type { PublicEntity } from '~~/types/etat'
+import { useEntity, type EntityWithChildren } from '~/composables/annuaire-etat/useEntity'
 
 const { keywords, siteUrl } = useSiteMetadata()
 const route = useRoute()
@@ -93,62 +92,93 @@ useHead({
   ],
 })
 
-// Group child entities into 3 fixed categories
-const childrenByCategory = computed(() => {
-  if (!entity.value?.child_entities) return { cabinet: [], secretariat: [], autres: [] }
+// Vérifier si l'entité peut avoir des structures rattachées
+const canHaveChildren = computed(() => {
+  if (!entity.value) return false
+  const allowedTypes = ['ministere', 'presidence', 'primature']
+  return allowedTypes.includes(entity.value.entity_type_id.code)
+})
 
-  const cabinet: PublicEntity[] = []
-  const secretariat: PublicEntity[] = []
-  const autres: PublicEntity[] = []
+// Get accordion sections (regroupement entities + direct special entities)
+const accordionSections = computed(() => {
+  if (!entity.value?.child_entities) {
+    return []
+  }
 
-  entity.value.child_entities.forEach((child: PublicEntity) => {
-    const typeCode = child.entity_type_id.code.toLowerCase()
+  const sections: Array<{ id: string; label: string; children: any[] }> = []
 
-    if (typeCode.includes('cabinet')) {
-      cabinet.push(child)
-    } else if (typeCode.includes('secretariat')) {
-      secretariat.push(child)
-    } else {
-      autres.push(child)
+  // 1. Add regroupement entities with their children
+  entity.value.child_entities.forEach((child: any) => {
+    const typeCode = typeof child.entity_type_id === 'string' ? child.entity_type_id : child.entity_type_id?.code
+
+    if (typeCode === 'entite_regroupement' && child.child_entities && child.child_entities.length > 0) {
+      sections.push({
+        id: child.id,
+        label: child.official_label || child.canonical_name,
+        children: child.child_entities || []
+      })
     }
   })
 
-  return { cabinet, secretariat, autres }
-})
+  // 2. Collect direct children that are special types (not in regroupement)
+  const directEtablissements: any[] = []
+  const directSocietesNationales: any[] = []
+  const directSocietesParticipation: any[] = []
 
-// Active tab
-const activeTab = ref('cabinet')
+  entity.value.child_entities.forEach((child: any) => {
+    const typeCode = typeof child.entity_type_id === 'string' ? child.entity_type_id : child.entity_type_id?.code
 
-// Create tabs (only show tabs with content)
-const tabs = computed(() => {
-  const tabsList = []
-  const categories = childrenByCategory.value
-
-  if (categories.cabinet.length > 0) {
-    tabsList.push({ id: 'cabinet', label: `Cabinet (${categories.cabinet.length})` })
-  }
-
-  if (categories.secretariat.length > 0) {
-    tabsList.push({ id: 'secretariat', label: `Secrétariat (${categories.secretariat.length})` })
-  }
-
-  if (categories.autres.length > 0) {
-    tabsList.push({ id: 'autres', label: `Autres administrations (${categories.autres.length})` })
-  }
-
-  return tabsList
-})
-
-// Set default active tab
-watch(
-  tabs,
-  (newTabs) => {
-    if (newTabs.length > 0 && !activeTab.value) {
-      activeTab.value = newTabs[0].id
+    // Skip regroupement entities (already processed)
+    if (typeCode === 'entite_regroupement') {
+      return
     }
-  },
-  { immediate: true },
-)
+
+    // Categorize special types
+    if (typeCode === 'etablissement_public') {
+      directEtablissements.push(child)
+    } else if (typeCode === 'societe_nationale') {
+      directSocietesNationales.push(child)
+    } else if (typeCode === 'societe_participation_publique') {
+      directSocietesParticipation.push(child)
+    }
+  })
+
+  // 3. Add sections for direct special types
+  if (directEtablissements.length > 0) {
+    sections.push({
+      id: `direct-etablissements-${entity.value.id}`,
+      label: 'Établissements publics',
+      children: directEtablissements
+    })
+  }
+
+  if (directSocietesNationales.length > 0) {
+    sections.push({
+      id: `direct-societes-nationales-${entity.value.id}`,
+      label: 'Sociétés nationales',
+      children: directSocietesNationales
+    })
+  }
+
+  if (directSocietesParticipation.length > 0) {
+    sections.push({
+      id: `direct-societes-participation-${entity.value.id}`,
+      label: 'Sociétés à participation publique',
+      children: directSocietesParticipation
+    })
+  }
+
+  return sections
+})
+
+// Create accordion items from regroupement sections
+const accordionItems = computed(() => {
+  return accordionSections.value.map((section, index) => ({
+    label: `${section.label} (${section.children.length})`,
+    slot: `section-${section.id}`,
+    defaultOpen: index === 0 // Open first section by default
+  }))
+})
 
 // Couleur de badge par type
 const getTypeColor = (typeCode: string) => {
@@ -270,9 +300,9 @@ const getTypeIcon = (typeCode: string) => {
 
       <!-- Layout 2 colonnes : Contenu principal + Coordonnées -->
       <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <!-- Contenu principal (2/3 de la largeur) -->
+        <!-- Contenu principal (2/3 de la largeur) - Uniquement pour ministère, présidence, primature -->
         <section
-          v-if="entity.child_entities && entity.child_entities.length > 0"
+          v-if="canHaveChildren && entity.child_entities && entity.child_entities.length > 0"
           class="lg:col-span-2"
         >
           <UCard>
@@ -282,57 +312,42 @@ const getTypeIcon = (typeCode: string) => {
               </h2>
             </template>
 
-            <!-- Tabs -->
-            <nav
-              v-if="tabs.length > 1"
-              class="-mt-4 mb-4 border-b border-gray-200 dark:border-gray-700"
-              aria-label="Sections"
-            >
-              <div class="flex gap-4 overflow-x-auto">
-                <button
-                  v-for="tab in tabs"
-                  :key="tab.id"
-                  @click="activeTab = tab.id"
-                  :class="[
-                    'whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition-colors',
-                    activeTab === tab.id
-                      ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-                      : 'border-transparent text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200',
-                  ]"
-                  :aria-selected="activeTab === tab.id"
-                  role="tab"
-                >
-                  {{ tab.label }}
-                </button>
-              </div>
-            </nav>
-
-            <!-- Contenu des tabs - NON CLIQUABLE -->
-            <div class="space-y-3" role="tabpanel">
-              <div
-                v-for="child in childrenByCategory[activeTab]"
-                :key="child.id"
-                class="flex items-center gap-3 rounded-lg border border-gray-200 p-3 dark:border-gray-700"
-              >
-                <UIcon
-                  :name="getTypeIcon(child.entity_type_id.code)"
-                  class="h-5 w-5 flex-shrink-0 text-gray-500 dark:text-gray-400"
-                />
-                <div class="min-w-0 flex-1">
-                  <div class="truncate font-medium text-gray-900 dark:text-white">
-                    {{ child.official_label || child.canonical_name }}
+            <!-- Accordion with dynamic sections -->
+            <UAccordion v-if="accordionItems.length > 0" :items="accordionItems" :ui="{ wrapper: 'space-y-2' }">
+              <template v-for="section in accordionSections" :key="section.id" #[`section-${section.id}`]>
+                <div class="space-y-2 pb-3">
+                  <div
+                    v-for="child in section.children"
+                    :key="child.id"
+                    class="flex items-center gap-3 rounded-lg border border-gray-200 p-3 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800/50"
+                  >
+                    <UIcon
+                      :name="getTypeIcon(typeof child.entity_type_id === 'string' ? child.entity_type_id : child.entity_type_id?.code)"
+                      class="h-5 w-5 flex-shrink-0 text-gray-500 dark:text-gray-400"
+                    />
+                    <div class="min-w-0 flex-1">
+                      <div class="truncate font-medium text-gray-900 dark:text-white">
+                        {{ child.official_label || child.canonical_name }}
+                      </div>
+                      <div v-if="typeof child.entity_type_id === 'object'" class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                        {{ child.entity_type_id.label }}
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <UBadge :color="getTypeColor(child.entity_type_id.code)" variant="subtle" size="xs">
-                  {{ child.entity_type_id.label }}
-                </UBadge>
-              </div>
+              </template>
+            </UAccordion>
+
+            <!-- Empty state if no sections -->
+            <div v-else class="py-8 text-center text-gray-500 dark:text-gray-400">
+              <UIcon name="i-heroicons-folder-open" class="mx-auto mb-3 h-12 w-12 opacity-50" />
+              <p>Aucune structure organisée trouvée.</p>
             </div>
           </UCard>
         </section>
 
-        <!-- Empty state if no children -->
-        <section v-else class="lg:col-span-2">
+        <!-- Empty state if no children and entity can have children -->
+        <section v-else-if="canHaveChildren && (!entity.child_entities || entity.child_entities.length === 0)" class="lg:col-span-2">
           <UCard>
             <template #header>
               <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
@@ -346,8 +361,8 @@ const getTypeIcon = (typeCode: string) => {
           </UCard>
         </section>
 
-        <!-- Coordonnées (1/3 de la largeur) -->
-        <aside class="lg:col-span-1">
+        <!-- Coordonnées (1/3 de la largeur si structures rattachées, sinon 3/3) -->
+        <aside :class="canHaveChildren ? 'lg:col-span-1' : 'lg:col-span-3'">
           <UCard>
             <template #header>
               <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Coordonnées</h2>
@@ -362,7 +377,7 @@ const getTypeIcon = (typeCode: string) => {
                 />
                 <div class="min-w-0 flex-1">
                   <div class="mb-1 text-xs text-gray-500 dark:text-gray-400">Adresse</div>
-                  <address class="text-sm not-italic text-gray-900 dark:text-white">
+                  <address class="text-sm not-italic text-gray-700 dark:text-white">
                     {{ entity.adresse }}
                   </address>
                 </div>

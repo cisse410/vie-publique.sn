@@ -1,7 +1,12 @@
 import type { PublicEntity } from '~~/types/etat'
 
 export interface EntityWithChildren extends PublicEntity {
-  child_entities: PublicEntity[]
+  child_entities: EntityWithNestedChildren[]
+}
+
+export interface EntityWithNestedChildren extends PublicEntity {
+  official_label?: string
+  child_entities?: EntityWithNestedChildren[]
 }
 
 export const useEntity = () => {

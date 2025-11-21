@@ -33,8 +33,11 @@ export function searchInTree(
   const results: TreeNode[] = []
 
   const searchNode = (node: TreeNode): boolean => {
+    // Exclure les entités de regroupement et sections virtuelles de la recherche
+    const isExcludedType = node.type.code === 'entite_regroupement' || node.type.code === 'section'
+
     // Vérifier si le nœud correspond à la recherche
-    const matchesSearch = searchFields.some((field) => {
+    const matchesSearch = !isExcludedType && searchFields.some((field) => {
       let value = ''
 
       if (field === 'official_label') {

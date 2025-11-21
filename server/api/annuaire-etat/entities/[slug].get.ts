@@ -89,10 +89,41 @@ export default defineCachedEventHandler(async (event) => {
           })
         )
 
-        childEntities = childSnapshots.map((snapshot: any) => ({
-          ...snapshot.public_entity_id,
-          official_label: snapshot.official_label
-        }))
+        // For each child, if it's an entite_regroupement, fetch its children too
+        childEntities = await Promise.all(
+          childSnapshots.map(async (snapshot: any) => {
+            const entity = {
+              ...snapshot.public_entity_id,
+              official_label: snapshot.official_label,
+              child_entities: []
+            }
+
+            // If this is a regroupement entity, fetch its children
+            if (typeof entity.entity_type_id === 'object' && entity.entity_type_id.code === 'entite_regroupement') {
+              const grandchildSnapshots = await client.request(
+                readItems('entity_snapshots', {
+                  filter: {
+                    decree_id: { _eq: decreeId },
+                    parent_snapshot_id: { _eq: snapshot.id }
+                  },
+                  fields: [
+                    '*',
+                    'public_entity_id.*',
+                    'public_entity_id.entity_type_id.*'
+                  ],
+                  sort: ['public_entity_id.canonical_name']
+                })
+              )
+
+              entity.child_entities = grandchildSnapshots.map((grandchildSnapshot: any) => ({
+                ...grandchildSnapshot.public_entity_id,
+                official_label: grandchildSnapshot.official_label
+              }))
+            }
+
+            return entity
+          })
+        )
       }
     }
 
