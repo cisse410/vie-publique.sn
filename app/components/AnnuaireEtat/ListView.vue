@@ -28,8 +28,8 @@
     <div v-if="totalPages > 1" class="mt-8 flex justify-center">
       <UPagination
         v-model="currentPage"
+        :page-count="totalPages"
         :total="filteredEntities.length"
-        :default-page="1"
         :show-edges="true"
         :sibling-count="2"
         :active-button="{ color: 'yellow' }"
@@ -79,12 +79,13 @@ const currentPage = computed({
 })
 const perPage = 20
 
-// Flatten tree et exclure les entités de regroupement et sections virtuelles
+// Flatten tree et exclure les entités de regroupement, sections virtuelles et racines construites
 const allEntities = computed(() => {
   const flattened = flattenTree(props.treeData)
   return flattened.filter(node =>
     node.type.code !== 'entite_regroupement' &&
-    node.type.code !== 'section'
+    node.type.code !== 'section' &&
+    !node.entity.id.startsWith('virtual-') // Exclure les racines virtuelles comme "Ministères"
   )
 })
 

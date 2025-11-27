@@ -358,19 +358,30 @@ export function groupChildrenBySections(node: TreeNode): TreeNode {
   sections.forEach(section => {
     // Vérifier si une entité de regroupement existe déjà avec un label similaire
     const normalizeLabel = (label: string) => label.toLowerCase().replace(/\s+/g, ' ').trim()
-    const hasRegroupement = regroupementChildren.some(child =>
-      normalizeLabel(child.snapshot.official_label).includes(normalizeLabel(section.label.split(' et ')[0]))
-    )
+    const sectionLabelNormalized = normalizeLabel(section.label.split(' et ')[0])
 
-    // Si une entité de regroupement existe déjà, ne pas créer de section virtuelle
-    if (hasRegroupement) {
-      return
-    }
+    const existingRegroupement = regroupementChildren.find(child => {
+      const childLabelNormalized = normalizeLabel(child.snapshot.official_label)
+      // Match exact ou si le label de l'enfant commence par le label de la section
+      return childLabelNormalized === sectionLabelNormalized ||
+             childLabelNormalized.startsWith(sectionLabelNormalized)
+    })
 
     const sectionChildren = directChildren.filter(child =>
       section.codes.includes(child.type.code)
     )
 
+    // Si une entité de regroupement existe déjà, ajouter les orphelins à celle-ci
+    if (existingRegroupement && sectionChildren.length > 0) {
+      // Ajouter les enfants directs aux enfants de l'entité de regroupement
+      existingRegroupement.children.push(...sectionChildren.map(child => ({
+        ...child,
+        level: existingRegroupement.level + 1
+      })))
+      return
+    }
+
+    // Si pas d'entité de regroupement, créer une section virtuelle seulement s'il y a des enfants
     if (sectionChildren.length > 0) {
       // Créer un nœud virtuel pour cette section
       const sectionNode: TreeNode = {

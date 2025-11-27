@@ -316,7 +316,7 @@ const formatDate = (dateStr: string) => {
               <UCard
                 :class="[
                   'transition-all',
-                  decret.status === 'active' ? 'border-2 border-primary-500' : '',
+                  decret.status === 'active' ? 'border-2 border-green-500' : '',
                   compareMode && isSelected(decret.id) ? 'ring-2 ring-blue-500' : '',
                 ]"
               >
@@ -332,8 +332,8 @@ const formatDate = (dateStr: string) => {
                         </h3>
                         <UBadge
                           v-if="decret.status === 'active'"
-                          color="primary"
-                          variant="solid"
+                          color="green"
+                          variant="subtle"
                           size="xs"
                         >
                           Actif

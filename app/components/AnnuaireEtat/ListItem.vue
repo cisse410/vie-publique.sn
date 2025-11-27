@@ -1,13 +1,12 @@
 <template>
   <div
-    class="list-item cursor-pointer rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 transition-shadow hover:shadow-md"
-    @click="$emit('click')"
+    :class="[
+      'list-item rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 transition-shadow hover:shadow-md',
+      node.entity.has_public_page ? 'cursor-pointer' : 'cursor-default'
+    ]"
+    @click="node.entity.has_public_page && $emit('click')"
   >
     <div class="flex items-start gap-3">
-      <!-- Icon -->
-      <div class="flex-shrink-0 text-2xl">
-        {{ entityIcon }}
-      </div>
 
       <!-- Content -->
       <div class="min-w-0 flex-1">
@@ -19,12 +18,20 @@
           {{ node.entity.canonical_name }}
         </p>
 
-        <!-- Parent -->
-        <div v-if="parentLabel" class="mb-2 text-sm text-gray-500 dark:text-gray-400">📍 {{ parentLabel }}</div>
-
-        <!-- Badges -->
+        <!-- Badges and chips -->
         <div class="mt-2 flex flex-wrap gap-2">
-          <TypeChip :type="node.type" size="sm" />
+          <!-- Ministry chip -->
+          <UBadge v-if="parentLabel" color="purple" variant="subtle" size="xs">
+            📍 {{ parentLabel }}
+          </UBadge>
+
+          <!-- Section type chip -->
+          <UBadge v-if="sectionLabel" color="blue" variant="subtle" size="xs">
+            {{ sectionLabel }}
+          </UBadge>
+
+          <!-- Entity type chip -->
+          <!-- <TypeChip :type="node.type" size="sm" /> -->
 
           <Badge v-if="change?.change === 'new'" color="green">Nouveau</Badge>
           <Badge v-else-if="change?.change === 'modified'" color="orange">
@@ -109,5 +116,22 @@ const findParentMinistry = (node: TreeNode): string | null => {
 const parentLabel = computed(() => {
   const ministry = findParentMinistry(props.node)
   return ministry
+})
+
+// Get section type label based on entity type
+const sectionLabel = computed(() => {
+  const typeCode = props.node.type.code
+
+  const sectionMap: Record<string, string> = {
+    cabinet: 'Cabinet et services rattachés',
+    secretariat: 'Secrétariat général et services rattachés',
+    direction: 'Directions',
+    direction_generale: 'Directions',
+    etablissement_public: 'Établissements publics',
+    societe_nationale: 'Sociétés nationales',
+    societe_participation_publique: 'Sociétés à participation publique',
+  }
+
+  return sectionMap[typeCode] || null
 })
 </script>

@@ -44,7 +44,6 @@
 
 <script setup lang="ts">
 import type { SnapshotComparison, TreeNode } from '~~/types/etat'
-import { highlightSearchTerm } from '~~/utils/search'
 
 interface UTreeNode {
   id: string
@@ -86,8 +85,14 @@ const uTreeNodes = computed(() => {
 
 function transformToUTree(nodes: TreeNode[]): UTreeNode[] {
   return nodes.map(node => {
-    const changeStatus = props.changes?.get(node.entity.id)?.change
-    const isVirtualSection = node.type.code === 'section' || node.entity.id.startsWith('virtual-')
+    // Use change_type from snapshot instead of comparison
+    let changeStatus: string | undefined
+    if (node.isNew) changeStatus = 'new'
+    else if (node.isModified) changeStatus = 'modified'
+    else if (node.isRemoved) changeStatus = 'removed'
+    else if (node.snapshot.change_type === 'unchanged') changeStatus = 'unchanged'
+
+    const isVirtualSection = node.type.code === 'section' || node.type.code === 'entite_regroupement' || node.entity.id.startsWith('virtual-')
 
     return {
       id: node.entity.id,

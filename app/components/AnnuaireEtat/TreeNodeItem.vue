@@ -1,13 +1,14 @@
 <template>
   <div class="tree-node-item">
-    <div
-      :class="[
-        'flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 transition-colors',
-        isVirtualSection
-          ? 'bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/30'
-          : 'hover:bg-gray-50 dark:hover:bg-gray-800',
-      ]"
+    <!-- isVirtualSection
+      ? 'bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/30'
+      : 'hover:bg-gray-50 dark:hover:bg-gray-800', -->
+      <div
       :style="{ marginLeft: `${level * 20}px` }"
+      :class="[
+        'flex items-center gap-2 rounded-lg px-3 py-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800',
+        isClickable ? 'cursor-pointer' : 'cursor-default',
+      ]"
       @click="handleClick"
     >
       <!-- Expand/Collapse button -->
@@ -16,32 +17,33 @@
         @click.stop="toggleExpand"
         class="flex h-5 w-5 flex-shrink-0 items-center justify-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
       >
-        <UIcon :name="isExpanded ? 'i-heroicons-chevron-down' : 'i-heroicons-chevron-right'" class="h-4 w-4" />
+        <UIcon
+          :name="isExpanded ? 'i-heroicons-chevron-down' : 'i-heroicons-chevron-right'"
+          class="h-4 w-4"
+        />
       </button>
       <span v-else class="w-5 flex-shrink-0"></span>
 
       <!-- Icon -->
-      <UIcon
-        :name="nodeIcon"
-        class="h-5 w-5 flex-shrink-0 text-gray-500 dark:text-gray-400"
-      />
+      <UIcon :name="nodeIcon" class="h-5 w-5 flex-shrink-0 text-gray-500 dark:text-gray-400" />
 
-      <!-- Label with search highlight -->
-      <span
-        :class="[
+        <!-- :class="[
           'flex-1 truncate font-medium',
           isVirtualSection
             ? 'font-semibold text-blue-700 dark:text-blue-300'
             : 'text-gray-900 dark:text-white'
-        ]"
+        ]" -->
+      <span
+        class="flex-1 truncate font-medium text-gray-900 dark:text-white"
         v-html="highlightedLabel"
       ></span>
 
-      <!-- Badges -->
-      <div class="flex flex-shrink-0 items-center gap-2">
+      <!-- Badges (only show for non-regroupement entities) -->
+      <div v-if="!isVirtualSection" class="flex flex-shrink-0 items-center gap-2">
         <UBadge v-if="changeStatus === 'new'" color="green" size="xs">Nouveau</UBadge>
         <UBadge v-else-if="changeStatus === 'modified'" color="orange" size="xs">Modifié</UBadge>
         <UBadge v-else-if="changeStatus === 'removed'" color="red" size="xs">Supprimé</UBadge>
+        <UBadge v-else-if="changeStatus === 'unchanged'" color="gray" size="xs">Inchangé</UBadge>
       </div>
     </div>
 
@@ -90,7 +92,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   level: 0,
   searchQuery: '',
-  changes: () => new Map()
+  changes: () => new Map(),
 })
 
 defineEmits<{
@@ -112,6 +114,15 @@ const highlightedLabel = computed(() => {
     return highlightSearchTerm(props.node.label, props.searchQuery)
   }
   return props.node.label
+})
+
+// Check if node is clickable (expandable or has public page)
+const isClickable = computed(() => {
+  if (isVirtualSection.value || hasChildren.value) {
+    return true
+  }
+  const originalNode = props.node.metadata?.originalNode
+  return originalNode?.entity?.has_public_page ?? false
 })
 
 const toggleExpand = () => {
