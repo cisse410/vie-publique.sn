@@ -219,7 +219,8 @@ const resetFilters = () => {
 // Navigate to entity
 const navigateToEntity = (node: TreeNode) => {
   if (node.entity.has_public_page) {
-    navigateTo(`/annuaire-etat/entites/${node.entity.slug}`)
+    const typeCode = typeof node.type === 'object' ? node.type.code : node.type
+    navigateTo(`/annuaire-etat/${typeCode}/${node.entity.slug}`)
   }
 }
 </script>

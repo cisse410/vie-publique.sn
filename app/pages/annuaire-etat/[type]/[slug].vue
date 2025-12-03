@@ -6,6 +6,7 @@ const route = useRoute()
 const { fetchEntity } = useEntity()
 
 const slug = route.params.slug as string
+const type = route.params.type as string
 
 // Fetch entity data with SSR via composable
 const {
@@ -26,7 +27,7 @@ if (error.value || !entity.value) {
 const title = entity.value.canonical_name
 const description =
   entity.value.description || `${entity.value.canonical_name} - Organisation de l'État du Sénégal`
-const url = `${siteUrl}/annuaire-etat/entites/${slug}`
+const url = `${siteUrl}/annuaire-etat/${type}/${slug}`
 
 // SEO Meta Tags optimisés
 useSeoMeta({

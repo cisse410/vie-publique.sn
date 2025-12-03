@@ -16,7 +16,7 @@
           <dt class="text-sm font-medium text-gray-500">Rattachement</dt>
           <dd class="mt-1">
             <NuxtLink
-              :to="`/entites/${parentInfo.slug}`"
+              :to="`/annuaire-etat/${parentInfo.type}/${parentInfo.slug}`"
               class="inline-flex items-center gap-2 text-blue-600 hover:underline"
             >
               {{ parentInfo.label }}
@@ -49,7 +49,7 @@
           v-for="child in children"
           :key="child.id"
           class="cursor-pointer rounded-lg p-3 transition-colors hover:bg-gray-50"
-          @click="navigateTo(`/entites/${getChildSlug(child)}`)"
+          @click="navigateTo(`/annuaire-etat/${getChildType(child)}/${getChildSlug(child)}`)"
         >
           <div class="flex items-center gap-2">
             <span class="text-xl">{{ getChildIcon(child) }}</span>
@@ -88,12 +88,17 @@ const parentInfo = computed(() => {
 
   const parentEntity = typeof parent.public_entity_id === 'object' ? parent.public_entity_id : null
 
-  return parentEntity
-    ? {
-        slug: parentEntity.slug,
-        label: parentEntity.canonical_name,
-      }
-    : null
+  if (!parentEntity) return null
+
+  const entityType = typeof parentEntity.entity_type_id === 'object'
+    ? parentEntity.entity_type_id.code
+    : parentEntity.entity_type_id
+
+  return {
+    slug: parentEntity.slug,
+    label: parentEntity.canonical_name,
+    type: entityType
+  }
 })
 
 // Decree info
@@ -114,5 +119,14 @@ const getChildIcon = (child: EntitySnapshot) => {
 const getChildSlug = (child: EntitySnapshot): string => {
   const entity = typeof child.public_entity_id === 'object' ? child.public_entity_id : null
   return entity?.slug || ''
+}
+
+const getChildType = (child: EntitySnapshot): string => {
+  const entity = typeof child.public_entity_id === 'object' ? child.public_entity_id : null
+  if (!entity) return ''
+  const entityType = typeof entity.entity_type_id === 'object'
+    ? entity.entity_type_id.code
+    : entity.entity_type_id
+  return entityType || ''
 }
 </script>

@@ -138,7 +138,8 @@ const handleClick = () => {
     if (originalNode) {
       // Navigate to entity page if it has a public page
       if (originalNode.entity.has_public_page) {
-        navigateTo(`/annuaire-etat/entites/${originalNode.entity.slug}`)
+        const typeCode = typeof originalNode.type === 'object' ? originalNode.type.code : originalNode.type
+        navigateTo(`/annuaire-etat/${typeCode}/${originalNode.entity.slug}`)
       }
     }
   }
