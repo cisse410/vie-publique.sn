@@ -3,11 +3,12 @@ import ListView from '~/components/AnnuaireEtat/ListView.vue'
 import TreeView from '~/components/AnnuaireEtat/TreeView.vue'
 import { useDecrees } from '~/composables/annuaire-etat/useDecrees'
 import { useEntityChanges } from '~/composables/annuaire-etat/useEntityChanges'
+import { useEntityList } from '~/composables/annuaire-etat/useEntityList'
 import { useFilters } from '~/composables/annuaire-etat/useFilters'
 import { useTree } from '~/composables/annuaire-etat/useTree'
 import type { TreeNode } from '~~/types/etat'
 import { searchInTree } from '~~/utils/search'
-import { filterTree, flattenTree, groupMinistries, applyGroupingToTree } from '~~/utils/tree-builder'
+import { applyGroupingToTree, filterTree, flattenTreeUnique, groupMinistries } from '~~/utils/tree-builder'
 
 const { keywords } = useSiteMetadata()
 const route = useRoute()
@@ -51,6 +52,8 @@ const {
 } = useDecrees()
 
 const { treeData, loading: treeLoading } = useTree()
+
+const { entities: listEntities, loading: listLoading } = useEntityList()
 
 const { changes, getChangeStats } = useEntityChanges()
 
@@ -156,7 +159,8 @@ const stats = computed(() => {
     }
   }
 
-  const allEntities = flattenTree(treeData.value)
+  // Utiliser flattenTreeUnique pour éviter les doublons dans les stats
+  const allEntities = flattenTreeUnique(treeData.value)
 
   // Compter uniquement les ministères (pas présidence ni primature)
   // On compte dans toutes les entités, pas seulement les racines
@@ -185,10 +189,23 @@ const stats = computed(() => {
   }
 })
 
-// Filtered result count (flatten tree to count all entities, not just root nodes)
+// Filtered result count from child components
+const listFilteredCount = ref(0)
+
 const filteredResultCount = computed(() => {
-  return flattenTree(filteredTreeData.value).length
+  if (viewMode.value === 'list') {
+    // Utiliser le comptage réel du composant ListView
+    return listFilteredCount.value
+  } else {
+    // Pour la vue arborescence
+    return flattenTreeUnique(filteredTreeData.value).length
+  }
 })
+
+// Handler pour recevoir le nombre d'entités filtrées de ListView
+const handleListFilteredCountUpdate = (count: number) => {
+  listFilteredCount.value = count
+}
 
 // Types de filtres à afficher (seulement les 4 types principaux)
 const displayedFilterTypes = computed(() => {
@@ -228,11 +245,27 @@ const navigateToEntity = (node: TreeNode) => {
 <template>
   <div class="flex flex-col px-4 py-6">
     <!-- En-tête -->
-    <div class="prose prose-sm mx-auto my-2 sm:prose">
-      <h1 class="text-center dark:text-white">Organisation de l'État du Sénégal</h1>
-      <p class="text-center text-gray-600 dark:text-gray-400">
-        Répartition des services de l'État selon le décret n° {{ selectedDecree?.numero }}
-      </p>
+    <div class="prose prose-sm sm:prose mx-auto my-4 max-w-4xl">
+      <h1 class="text-center dark:text-white">Annuaire de l'État du Sénégal</h1>
+
+      <div class="text-sm sm:text-base text-gray-700 dark:text-gray-300 bg-blue-50 dark:bg-blue-950/30 p-4 sm:p-6 rounded-lg border border-blue-200 dark:border-blue-800 not-prose">
+        <p class="mb-3 leading-relaxed">
+          Explorez l'organisation complète de l'administration publique sénégalaise dans sa structure actuelle.
+          Cet annuaire présente la répartition des services de l'État entre la Présidence de la République,
+          la Primature et les différents ministères.
+        </p>
+        <p class="mb-3 leading-relaxed">
+          Retrouvez les <strong class="text-purple-700 dark:text-purple-400">{{ stats.ministeres }} ministères</strong>,
+          les <strong class="text-green-700 dark:text-green-400">{{ stats.etablissements_publics }} établissements publics</strong>,
+          les <strong class="text-orange-700 dark:text-orange-400">{{ stats.societes_participation }} sociétés à participation publique</strong>
+          et les <strong class="text-blue-700 dark:text-blue-400">{{ stats.societes_nationales }} sociétés nationales</strong>
+          rattachés à chaque entité.
+        </p>
+        <p class="text-xs sm:text-sm text-gray-600 dark:text-gray-400 italic mb-0">
+          <UIcon name="i-heroicons-document-text" class="inline w-4 h-4" />
+          Basé sur le décret n° {{ selectedDecree?.numero ?? '2025-1431' }} du {{ selectedDecree?.date_publication ?? '06 septembre 2025' }}
+        </p>
+      </div>
     </div>
 
     <div class="mx-auto mt-8 w-full max-w-6xl space-y-6">
@@ -431,13 +464,14 @@ const navigateToEntity = (node: TreeNode) => {
       <!-- List view -->
       <ListView
         v-else
-        :tree-data="filteredTreeData"
-        :loading="treeLoading"
+        :entities="listEntities"
+        :loading="listLoading"
         :changes="changes"
         :search-query="searchQuery"
         :selected-types="selectedTypes"
         v-model:current-page="currentPage"
         @entity-click="navigateToEntity"
+        @update:filtered-count="handleListFilteredCountUpdate"
       />
     </div>
   </div>

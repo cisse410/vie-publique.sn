@@ -30,16 +30,14 @@
             {{ sectionLabel }}
           </UBadge>
 
-          <!-- Entity type chip -->
-          <!-- <TypeChip :type="node.type" size="sm" /> -->
-
-          <Badge v-if="change?.change === 'new'" color="green">Nouveau</Badge>
-          <Badge v-else-if="change?.change === 'modified'" color="orange">
-            Modifié
+          <!-- <UBadge v-if="change?.change === 'new'" color="green">Nouveau</UBadge>
+          <UBadge v-else-if="change?.change === 'modified'" color="orange">
+            Modifiée
             <span v-if="change.changes_detail?.label_changed" class="ml-1">(nom)</span>
             <span v-if="change.changes_detail?.parent_changed" class="ml-1">(tutelle)</span>
-          </Badge>
-          <Badge v-else-if="change?.change === 'removed'" color="red">Supprimé</Badge>
+          </UBadge>
+          <UBadge v-else-if="change?.change === 'unchanged'" color="gray">Inchangée</UBadge>
+          <UBadge v-else-if="change?.change === 'removed'" color="red">Supprimée</UBadge> -->
         </div>
       </div>
 

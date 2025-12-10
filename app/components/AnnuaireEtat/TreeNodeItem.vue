@@ -41,9 +41,9 @@
       <!-- Badges (only show for non-regroupement entities) -->
       <div v-if="!isVirtualSection" class="flex flex-shrink-0 items-center gap-2">
         <UBadge v-if="changeStatus === 'new'" color="green" size="xs">Nouveau</UBadge>
-        <UBadge v-else-if="changeStatus === 'modified'" color="orange" size="xs">Modifié</UBadge>
-        <UBadge v-else-if="changeStatus === 'removed'" color="red" size="xs">Supprimé</UBadge>
-        <UBadge v-else-if="changeStatus === 'unchanged'" color="gray" size="xs">Inchangé</UBadge>
+        <UBadge v-else-if="changeStatus === 'modified'" color="orange" size="xs">Modifiée</UBadge>
+        <UBadge v-else-if="changeStatus === 'removed'" color="red" size="xs">Supprimée</UBadge>
+        <UBadge v-else-if="changeStatus === 'unchanged'" color="gray" size="xs">Inchangée</UBadge>
       </div>
     </div>
 

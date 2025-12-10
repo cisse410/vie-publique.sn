@@ -129,6 +129,31 @@ export function flattenTree(nodes: TreeNode[]): TreeNode[] {
 }
 
 /**
+ * Aplatit un arbre et retourne uniquement les entités réelles (pas les nœuds virtuels/regroupement)
+ * avec déduplication par entity.id
+ */
+export function flattenTreeUnique(nodes: TreeNode[]): TreeNode[] {
+  const flattened = flattenTree(nodes)
+
+  // Filtrer les entités virtuelles et de regroupement
+  const realEntities = flattened.filter(node =>
+    node.type.code !== 'entite_regroupement' &&
+    node.type.code !== 'section' &&
+    !node.entity.id.startsWith('virtual-')
+  )
+
+  // Dédupliquer par entity.id
+  const uniqueEntities = new Map<string, TreeNode>()
+  realEntities.forEach(node => {
+    if (!uniqueEntities.has(node.entity.id)) {
+      uniqueEntities.set(node.entity.id, node)
+    }
+  })
+
+  return Array.from(uniqueEntities.values())
+}
+
+/**
  * Trouve un nœud dans l'arbre par ID d'entité
  */
 export function findNodeByEntityId(
@@ -355,7 +380,8 @@ export function groupChildrenBySections(node: TreeNode): TreeNode {
   const groupedChildren: TreeNode[] = []
   const ungroupedChildren: TreeNode[] = []
 
-  sections.forEach(section => {
+  // Utiliser for...of au lieu de forEach pour pouvoir utiliser continue
+  for (const section of sections) {
     // Vérifier si une entité de regroupement existe déjà avec un label similaire
     const normalizeLabel = (label: string) => label.toLowerCase().replace(/\s+/g, ' ').trim()
     const sectionLabelNormalized = normalizeLabel(section.label.split(' et ')[0])
@@ -378,7 +404,8 @@ export function groupChildrenBySections(node: TreeNode): TreeNode {
         ...child,
         level: existingRegroupement.level + 1
       })))
-      return
+      // Passer à la section suivante sans créer de nœud virtuel
+      continue
     }
 
     // Si pas d'entité de regroupement, créer une section virtuelle seulement s'il y a des enfants
@@ -446,7 +473,7 @@ export function groupChildrenBySections(node: TreeNode): TreeNode {
 
       groupedChildren.push(sectionNode)
     }
-  })
+  }
 
   // Récupérer les enfants directs qui ne correspondent à aucune section
   const allSectionCodes = sections.flatMap(s => s.codes)
