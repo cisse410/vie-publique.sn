@@ -19,7 +19,7 @@ export default defineCachedEventHandler(async (event) => {
   const client = getEtatCmsClient()
 
   try {
-    // Récupérer tous les snapshots pour ce décret
+    // Récupérer tous les snapshots pour ce décret avec la hiérarchie complète
     const snapshots = await client.request(
       readItems('entity_snapshots', {
         filter: {
@@ -28,7 +28,19 @@ export default defineCachedEventHandler(async (event) => {
         fields: [
           '*',
           'public_entity_id.*',
-          'public_entity_id.entity_type_id.*'
+          'public_entity_id.entity_type_id.*',
+          // Parent level 1
+          'parent_snapshot_id.*',
+          'parent_snapshot_id.public_entity_id.*',
+          'parent_snapshot_id.public_entity_id.entity_type_id.*',
+          // Parent level 2 (pour atteindre le ministère depuis les sous-directions)
+          'parent_snapshot_id.parent_snapshot_id.*',
+          'parent_snapshot_id.parent_snapshot_id.public_entity_id.*',
+          'parent_snapshot_id.parent_snapshot_id.public_entity_id.entity_type_id.*',
+          // Parent level 3 (pour les cas très imbriqués)
+          'parent_snapshot_id.parent_snapshot_id.parent_snapshot_id.*',
+          'parent_snapshot_id.parent_snapshot_id.parent_snapshot_id.public_entity_id.*',
+          'parent_snapshot_id.parent_snapshot_id.parent_snapshot_id.public_entity_id.entity_type_id.*',
         ],
         limit: -1
       })

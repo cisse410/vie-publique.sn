@@ -18,14 +18,17 @@
           {{ node.entity.canonical_name }}
         </p>
 
-        <!-- Badges and chips -->
-        <div class="mt-2 flex flex-wrap gap-2">
-          <!-- Ministry chip -->
-          <UBadge v-if="parentLabel" color="purple" variant="subtle" size="xs">
-            📍 {{ parentLabel }}
+        <!-- Badges and chips - Hiérarchie -->
+        <div class="mt-2 flex flex-wrap items-center gap-2">
+          <!-- Ministry chip (parent) -->
+          <UBadge v-if="parentLabel" color="purple" variant="subtle" size="xs" class="font-medium">
+            {{ parentLabel }}
           </UBadge>
 
-          <!-- Section type chip -->
+          <!-- Arrow separator -->
+          <span v-if="parentLabel && sectionLabel" class="text-gray-400 dark:text-gray-600 text-xs">→</span>
+
+          <!-- Section type chip (child) -->
           <UBadge v-if="sectionLabel" color="blue" variant="subtle" size="xs">
             {{ sectionLabel }}
           </UBadge>
